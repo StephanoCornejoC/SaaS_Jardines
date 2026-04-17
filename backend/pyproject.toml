@@ -1,0 +1,208 @@
+[tool.ruff]
+# Ruff: linter + formatter unificado para Python
+# Referencia: https://docs.astral.sh/ruff/
+target-version = "py312"
+line-length = 100
+indent-width = 4
+
+# Directorios a excluir del analisis
+exclude = [
+    ".git",
+    "__pycache__",
+    "*/migrations/*",
+    ".venv",
+    "venv",
+    "staticfiles",
+    "media",
+    "dist",
+    "build",
+]
+
+[tool.ruff.lint]
+# Reglas habilitadas (prefijos):
+#   E/W   = pycodestyle (errores y warnings de estilo)
+#   F     = Pyflakes (imports no usados, nombres no definidos)
+#   I     = isort (orden de imports)
+#   N     = pep8-naming (convenciones de nombres)
+#   UP    = pyupgrade (migracion a Python moderno)
+#   B     = flake8-bugbear (bugs potenciales y code smells)
+#   C4    = flake8-comprehensions (simplificacion de comprehensions)
+#   C90   = mccabe (complejidad ciclomatica)
+#   DJ    = flake8-django (reglas especificas de Django)
+#   S     = flake8-bandit (seguridad - reglas bandit)
+#   T20   = flake8-print (uso de print statements)
+#   ANN   = flake8-annotations (type annotations)
+#   RUF   = Ruff-specific rules
+#   SIM   = flake8-simplify (simplificacion de codigo)
+#   PTH   = flake8-use-pathlib (usar pathlib en lugar de os.path)
+#   ERA   = eradicate (codigo comentado)
+#   PL    = Pylint (subset de reglas)
+#   TRY   = tryceratops (buenas practicas con excepciones)
+
+select = [
+    "E",
+    "W",
+    "F",
+    "I",
+    "N",
+    "UP",
+    "B",
+    "C4",
+    "C90",
+    "DJ",
+    "S",
+    "T20",
+    "RUF",
+    "SIM",
+    "ERA",
+    "TRY",
+]
+
+ignore = [
+    # E501 es manejado por el formatter (line-length)
+    "E501",
+    # W503 es obsoleto en PEP 8 moderno
+    "W503",
+    # ANN101/ANN102: tipo de self/cls en metodos (no necesario)
+    "ANN101",
+    "ANN102",
+    # S101: uso de assert en tests es valido
+    "S101",
+    # TRY003: mensajes largos en excepciones - permitido en Django
+    "TRY003",
+    # TRY300: return en try - estilo aceptado
+    "TRY300",
+    # B008: llamadas a funciones en defaults de argumentos - comun en DRF
+    "B008",
+    # RUF012: ClassVar en modelos Django - falsos positivos con TextChoices
+    "RUF012",
+    # ERA001: codigo comentado - puede haber comentarios de configuracion
+    "ERA001",
+]
+
+# Reglas que solo aplican como warnings (no bloquean CI)
+# (mover a ignore para silenciar, o a select para hacer error)
+
+[tool.ruff.lint.per-file-ignores]
+# En archivos de settings: imports * son necesarios (from .base import *)
+"config/settings/*.py" = ["F401", "F403", "F405"]
+# En archivos de migraciones: codigo generado automaticamente
+"*/migrations/*.py" = ["E501", "N806", "N999", "RUF012"]
+# En manage.py y wsgi/asgi: imports de configuracion
+"manage.py" = ["INP001"]
+# En tests: permitir asserts y strings magicas
+"**/tests/**" = ["S101", "S105", "S106", "ANN"]
+# En admin.py: list_display con strings es idiomatico en Django
+"**/admin.py" = ["RUF012"]
+
+[tool.ruff.lint.isort]
+# Configuracion de orden de imports (equivalente a isort)
+known-first-party = ["apps", "config", "shared"]
+known-third-party = ["django", "rest_framework", "celery"]
+section-order = [
+    "future",
+    "standard-library",
+    "third-party",
+    "first-party",
+    "local-folder",
+]
+force-sort-within-sections = true
+split-on-trailing-comma = true
+
+[tool.ruff.lint.mccabe]
+# Complejidad ciclomatica maxima permitida (C90)
+# Umbral de warning: 10 | Umbral de bloqueo: 15
+max-complexity = 10
+
+[tool.ruff.lint.pep8-naming]
+# Convenciones de nombres
+# classmethod-decorators: reconocer decoradores de classmethods
+classmethod-decorators = [
+    "classmethod",
+    "django.utils.decorators.classonlymethod",
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# B950: line-length con 10% de tolerancia (similar a black)
+extend-default-select = ["B950"]
+
+[tool.ruff.lint.flake8-bandit]
+# Reglas de seguridad habilitadas (subset critico):
+# S102 exec()        - ejecucion de codigo dinamico
+# S105 hardcoded-password-string
+# S106 hardcoded-password-func-arg
+# S107 hardcoded-password-default
+# S108 probable-insecure-usage-of-temp-file
+# S110 try-except-pass
+# S301 pickle - deserializacion insegura
+# S324 hashlib-insecure-hash-functions (md5, sha1)
+# S501 request-with-no-cert-validation
+# S506 unsafe-yaml-load
+# Activados via "S" en select
+
+[tool.ruff.lint.pylint]
+max-args = 7
+max-branches = 12
+max-returns = 5
+max-statements = 50
+
+[tool.ruff.format]
+# Configuracion del formatter (reemplaza black)
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = 80
+
+# ---- Configuracion de herramientas complementarias ----
+
+[tool.mypy]
+# Type checking con mypy (opcional, para proyectos maduros)
+python_version = "3.12"
+ignore_missing_imports = true
+disallow_untyped_defs = false
+warn_return_any = false
+warn_unused_ignores = true
+exclude = ["migrations/"]
+
+[tool.pytest.ini_options]
+# Configuracion de pytest
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["tests.py", "test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "-ra",
+    "--tb=short",
+]
+markers = [
+    "slow: tests lentos (use -m 'not slow' para excluirlos)",
+    "integration: tests de integracion que requieren BD",
+    "unit: tests unitarios puros",
+]
+
+[tool.coverage.run]
+source = ["apps"]
+omit = [
+    "*/migrations/*",
+    "*/tests/*",
+    "*/admin.py",
+    "manage.py",
+    "config/wsgi.py",
+    "config/asgi.py",
+]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "def __str__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "pass",
+]

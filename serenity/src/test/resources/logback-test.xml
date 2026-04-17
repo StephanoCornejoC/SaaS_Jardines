@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.FileAppender">
+    <file>target/serenity-e2e.log</file>
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- Reducir ruido de Serenity y Selenium -->
+  <logger name="net.serenitybdd" level="WARN" />
+  <logger name="net.thucydides" level="WARN" />
+  <logger name="org.openqa.selenium" level="WARN" />
+  <logger name="io.github.bonigarcia" level="INFO" />
+
+  <!-- Logs de la suite COREM en INFO -->
+  <logger name="com.corem.saas" level="INFO" />
+
+  <!-- Rest-Assured en WARN para no contaminar logs en exito -->
+  <logger name="io.restassured" level="WARN" />
+
+  <root level="WARN">
+    <appender-ref ref="CONSOLE" />
+    <appender-ref ref="FILE" />
+  </root>
+
+</configuration>

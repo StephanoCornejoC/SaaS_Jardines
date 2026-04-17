@@ -1,0 +1,64 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+from .managers import CustomUserManager
+
+
+class User(AbstractUser):
+    """
+    Usuario personalizado. Usa email como campo de autenticación en lugar de username.
+    """
+
+    class Role(models.TextChoices):
+        SUPERADMIN = "SUPERADMIN", "Superadmin"
+        ADMIN_JARDIN = "ADMIN_JARDIN", "Admin Jardín"
+        DIRECTOR = "DIRECTOR", "Director(a)"
+        SECRETARIA = "SECRETARIA", "Secretaria"
+        PROFESOR = "PROFESOR", "Profesor(a)"
+
+    # Eliminar username, usar email como identificador
+    username = None
+    email = models.EmailField("Correo electrónico", unique=True)
+
+    role = models.CharField(
+        "Rol",
+        max_length=20,
+        choices=Role.choices,
+        default=Role.PROFESOR,
+    )
+    telefono = models.CharField("Teléfono", max_length=20, blank=True, null=True)
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["first_name", "last_name"]
+
+    objects = CustomUserManager()
+
+    class Meta:
+        verbose_name = "Usuario"
+        verbose_name_plural = "Usuarios"
+        ordering = ["email"]
+
+    def __str__(self):
+        return f"{self.get_full_name()} ({self.email})"
+
+    # --------------- Role helpers ---------------
+
+    @property
+    def is_superadmin(self) -> bool:
+        return self.role == self.Role.SUPERADMIN
+
+    @property
+    def is_admin_jardin(self) -> bool:
+        return self.role == self.Role.ADMIN_JARDIN
+
+    @property
+    def is_director(self) -> bool:
+        return self.role == self.Role.DIRECTOR
+
+    @property
+    def is_secretaria(self) -> bool:
+        return self.role == self.Role.SECRETARIA
+
+    @property
+    def is_profesor(self) -> bool:
+        return self.role == self.Role.PROFESOR

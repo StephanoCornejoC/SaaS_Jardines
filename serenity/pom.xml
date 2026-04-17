@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.corem.saas</groupId>
+  <artifactId>serenity-e2e</artifactId>
+  <version>1.0.0</version>
+  <packaging>jar</packaging>
+
+  <name>SAAS COREM - Serenity BDD E2E Suite</name>
+  <description>Screenplay Pattern E2E test suite for SAAS COREM kindergarten management system</description>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <java.version>17</java.version>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+
+    <!-- Serenity -->
+    <serenity.version>4.1.20</serenity.version>
+    <serenity.cucumber.version>4.1.20</serenity.cucumber.version>
+
+    <!-- Cucumber -->
+    <cucumber.version>7.15.0</cucumber.version>
+
+    <!-- JUnit 5 -->
+    <junit.version>5.10.2</junit.version>
+
+    <!-- Selenium -->
+    <selenium.version>4.18.1</selenium.version>
+
+    <!-- WebDriverManager -->
+    <webdrivermanager.version>5.8.0</webdrivermanager.version>
+
+    <!-- Rest-Assured -->
+    <restassured.version>5.4.0</restassured.version>
+
+    <!-- Lombok -->
+    <lombok.version>1.18.32</lombok.version>
+
+    <!-- Maven plugins -->
+    <maven.surefire.version>3.2.5</maven.surefire.version>
+    <maven.failsafe.version>3.2.5</maven.failsafe.version>
+  </properties>
+
+  <dependencies>
+
+    <!-- ============================
+         SERENITY CORE
+         ============================ -->
+    <dependency>
+      <groupId>net.serenity-bdd</groupId>
+      <artifactId>serenity-core</artifactId>
+      <version>${serenity.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Serenity Screenplay -->
+    <dependency>
+      <groupId>net.serenity-bdd</groupId>
+      <artifactId>serenity-screenplay</artifactId>
+      <version>${serenity.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Serenity Screenplay WebDriver -->
+    <dependency>
+      <groupId>net.serenity-bdd</groupId>
+      <artifactId>serenity-screenplay-webdriver</artifactId>
+      <version>${serenity.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Serenity Cucumber (JUnit 5) -->
+    <dependency>
+      <groupId>net.serenity-bdd</groupId>
+      <artifactId>serenity-cucumber</artifactId>
+      <version>${serenity.cucumber.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Serenity JUnit 5 -->
+    <dependency>
+      <groupId>net.serenity-bdd</groupId>
+      <artifactId>serenity-junit5</artifactId>
+      <version>${serenity.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Serenity Rest (for API calls in tasks) -->
+    <dependency>
+      <groupId>net.serenity-bdd</groupId>
+      <artifactId>serenity-rest-assured</artifactId>
+      <version>${serenity.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Serenity Ensure (fluent assertions en Screenplay) -->
+    <dependency>
+      <groupId>net.serenity-bdd</groupId>
+      <artifactId>serenity-ensure</artifactId>
+      <version>${serenity.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ============================
+         CUCUMBER
+         ============================ -->
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-java</artifactId>
+      <version>${cucumber.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-junit-platform-engine</artifactId>
+      <version>${cucumber.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ============================
+         JUNIT 5
+         ============================ -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-api</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter-engine</artifactId>
+      <version>${junit.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+      <version>1.10.2</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ============================
+         SELENIUM WEBDRIVER
+         ============================ -->
+    <dependency>
+      <groupId>org.seleniumhq.selenium</groupId>
+      <artifactId>selenium-java</artifactId>
+      <version>${selenium.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- WebDriverManager: auto-descarga chromedriver -->
+    <dependency>
+      <groupId>io.github.bonigarcia</groupId>
+      <artifactId>webdrivermanager</artifactId>
+      <version>${webdrivermanager.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ============================
+         REST-ASSURED (setup de datos via API)
+         ============================ -->
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>rest-assured</artifactId>
+      <version>${restassured.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>json-path</artifactId>
+      <version>${restassured.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ============================
+         UTILIDADES
+         ============================ -->
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <version>${lombok.version}</version>
+      <scope>provided</scope>
+    </dependency>
+
+    <!-- Jackson para JSON -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>2.17.0</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- SLF4J + Logback -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+      <version>2.0.12</version>
+      <scope>test</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>ch.qos.logback</groupId>
+      <artifactId>logback-classic</artifactId>
+      <version>1.5.3</version>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <!-- Maven Compiler -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <source>17</source>
+          <target>17</target>
+          <encoding>UTF-8</encoding>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+              <version>${lombok.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+
+      <!-- Maven Failsafe (para integracion/E2E) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>${maven.failsafe.version}</version>
+        <configuration>
+          <includes>
+            <include>**/runners/**IT.java</include>
+            <include>**/runners/**Runner.java</include>
+          </includes>
+          <systemPropertyVariables>
+            <webdriver.base.url>${webdriver.base.url}</webdriver.base.url>
+            <environment>${environment}</environment>
+          </systemPropertyVariables>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Serenity Maven Plugin (genera reportes) -->
+      <plugin>
+        <groupId>net.serenity-bdd.maven.plugins</groupId>
+        <artifactId>serenity-maven-plugin</artifactId>
+        <version>${serenity.version}</version>
+        <dependencies>
+          <dependency>
+            <groupId>net.serenity-bdd</groupId>
+            <artifactId>serenity-single-page-report</artifactId>
+            <version>${serenity.version}</version>
+          </dependency>
+        </dependencies>
+        <configuration>
+          <tags>${tags}</tags>
+        </configuration>
+        <executions>
+          <execution>
+            <id>serenity-reports</id>
+            <phase>post-integration-test</phase>
+            <goals>
+              <goal>aggregate</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- Maven Surefire (deshabilitar para que no interfiera con Failsafe) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.version}</version>
+        <configuration>
+          <skipTests>true</skipTests>
+        </configuration>
+      </plugin>
+
+    </plugins>
+  </build>
+
+  <!-- Perfiles para multi-ambiente -->
+  <profiles>
+    <profile>
+      <id>local</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <environment>local</environment>
+        <webdriver.base.url>http://localhost:3000</webdriver.base.url>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>ci</id>
+      <properties>
+        <environment>ci</environment>
+        <webdriver.base.url>http://localhost:3000</webdriver.base.url>
+      </properties>
+    </profile>
+
+    <profile>
+      <id>headless</id>
+      <properties>
+        <environment>local</environment>
+        <headless>true</headless>
+      </properties>
+    </profile>
+  </profiles>
+
+</project>

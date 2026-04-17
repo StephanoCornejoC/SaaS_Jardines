@@ -1,0 +1,82 @@
+###########################
+# Maven
+###########################
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+
+###########################
+# Serenity Reports (generados en cada ejecucion)
+###########################
+target/site/serenity/
+target/cucumber-reports/
+target/serenity-e2e.log
+
+###########################
+# Screenshtos y videos (no versionar)
+###########################
+target/screenshots/
+target/video/
+target/downloads/
+
+###########################
+# WebDriver binaries descargados por WebDriverManager
+###########################
+.wdm/
+
+###########################
+# IntelliJ IDEA
+###########################
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+###########################
+# Eclipse
+###########################
+.settings/
+.classpath
+.project
+.factorypath
+bin/
+
+###########################
+# VS Code
+###########################
+.vscode/
+
+###########################
+# Windows
+###########################
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+###########################
+# macOS
+###########################
+.DS_Store
+.AppleDouble
+.LSOverride
+
+###########################
+# Logs
+###########################
+*.log
+logs/
+
+###########################
+# Datos de prueba temporales
+###########################
+test-results/
+downloads/

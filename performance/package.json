@@ -1,0 +1,30 @@
+{
+  "name": "saas-corem-performance-tests",
+  "version": "1.0.0",
+  "description": "Performance tests for SAAS COREM using k6 (Grafana). k6 is a standalone binary, not a Node.js package.",
+  "scripts": {
+    "smoke":   "k6 run --env ENV=local  scripts/smoke.js",
+    "load":    "k6 run --env ENV=local  scripts/load.js",
+    "stress":  "k6 run --env ENV=local  scripts/stress.js",
+    "spike":   "k6 run --env ENV=local  scripts/spike.js",
+    "soak":    "k6 run --env ENV=local  scripts/soak.js",
+    "students":"k6 run --env ENV=local  scripts/crud-students.js",
+    "payments":"k6 run --env ENV=local  scripts/payments-flow.js",
+    "reports": "k6 run --env ENV=local  scripts/reports-heavy.js",
+    "mixed":   "k6 run --env ENV=local  scenarios/mixed-realistic.js",
+    "smoke:staging":  "k6 run --env ENV=staging  scripts/smoke.js",
+    "load:staging":   "k6 run --env ENV=staging  scripts/load.js",
+    "stress:staging": "k6 run --env ENV=staging  scripts/stress.js"
+  },
+  "engines": {
+    "k6": ">=0.49.0"
+  },
+  "notes": [
+    "k6 es un binario Go, no un paquete npm.",
+    "Instalar: https://k6.io/docs/get-started/installation/",
+    "Windows:  winget install k6 --source winget",
+    "Linux:    sudo snap install k6",
+    "Para exportar metricas a InfluxDB: k6 run --out influxdb=http://localhost:8086/k6 scripts/load.js",
+    "Para Grafana Cloud:                k6 run --out cloud scripts/load.js  (requiere K6_CLOUD_TOKEN)"
+  ]
+}
