@@ -76,12 +76,16 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
         return Response(PaymentDetailSerializer(payment).data)
 
-    @action(detail=True, methods=["post"], url_path="generar-qr")
+    @action(detail=True, methods=["get", "post"], url_path="generar-qr")
     def generar_qr(self, request, pk=None):
-        """Genera un codigo QR para el pago."""
+        """Genera un codigo QR para el pago (PNG image)."""
+        from django.http import HttpResponse
+
         payment = self.get_object()
-        qr_url = generate_yape_qr(payment.student, payment)
-        return Response({"qr_url": qr_url}, status=status.HTTP_201_CREATED)
+        qr_bytes = generate_yape_qr(payment.student, payment)
+        response = HttpResponse(qr_bytes, content_type="image/png")
+        response["Cache-Control"] = "no-cache"
+        return response
 
     @action(detail=False, methods=["get"], url_path="morosidad")
     def morosidad(self, request):

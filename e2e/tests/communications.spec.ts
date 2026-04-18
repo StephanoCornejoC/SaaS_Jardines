@@ -76,21 +76,23 @@ test.describe('Comunicaciones', () => {
     const modal = page.locator('.ant-modal', { hasText: 'Nueva Comunicacion' });
     await expect(modal).toBeVisible();
 
-    // Con tipo GENERAL (default), el campo Aula no debe ser visible
-    await expect(modal.locator('.ant-form-item', { hasText: 'Aula' })).toBeHidden();
+    // Con tipo GENERAL (default), el combobox de Aula no debe ser visible
+    await expect(modal.getByRole('combobox', { name: /Aula/ })).toBeHidden();
 
     // Cambiar el tipo a POR_AULA
-    const tipoSelect = modal.locator('.ant-select').filter({
-      has: modal.locator('.ant-form-item-label', { hasText: 'Tipo' }),
-    });
-    await tipoSelect.click();
+    // Ant Design Select: el trigger clickable es el .ant-select-selector dentro de .ant-select.
+    // Localizamos el .ant-select que es ancestro del combobox con nombre que contiene "Tipo".
+    // Como el modal tiene dos campos Input (Titulo, Contenido) antes del Tipo,
+    // el select de Tipo es el primero (y unico) .ant-select dentro del modal en este punto.
+    await modal.locator('.ant-select-selector').first().click();
     await page
       .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
       .getByTitle('Por Aula')
       .click();
 
     // Ahora el campo Aula debe aparecer (renderizado condicionalmente)
-    await expect(modal.locator('.ant-form-item', { hasText: 'Aula' })).toBeVisible();
+    // El combobox del selector de Aula debe estar visible en el modal
+    await expect(modal.getByRole('combobox', { name: /Aula/ })).toBeVisible();
 
     // Cancelar sin guardar
     await modal.locator('.ant-modal-footer button:not(.ant-btn-primary)').click();
@@ -128,7 +130,8 @@ test.describe('Comunicaciones', () => {
     await expect(popconfirm).toContainText('Enviar esta comunicacion?');
 
     // Confirmar el envio haciendo click en el boton de confirmacion del Popconfirm
-    await popconfirm.getByRole('button', { name: 'OK' }).click();
+    // En Ant Design 5 con locale en espanol, el boton OK del Popconfirm se muestra como "Aceptar"
+    await popconfirm.getByRole('button', { name: 'Aceptar' }).click();
 
     // Verificar mensaje de exito
     await expect(

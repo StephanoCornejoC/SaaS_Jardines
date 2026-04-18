@@ -94,11 +94,31 @@ export class AttendancePage {
     };
     const row = this.tableRows.nth(rowIndex);
     const rowSelect = row.locator('.ant-select');
+
+    // Cerrar cualquier dropdown abierto antes de abrir el nuevo
+    // (evita strict mode violation cuando hay multiples dropdowns visibles)
+    await expect(this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')).toHaveCount(0, { timeout: 3000 }).catch(() => {
+      // Si hay un dropdown abierto, hacer Escape para cerrarlo
+    });
+
     await rowSelect.click();
+
+    // Esperar a que SOLO haya un dropdown visible (el de esta fila)
+    await expect(
+      this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    ).toHaveCount(1, { timeout: 5000 });
+
+    // Seleccionar la opcion usando .first() por seguridad
     await this.page
       .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+      .first()
       .getByTitle(estadoLabels[estado])
       .click();
+
+    // Esperar a que el dropdown se cierre
+    await expect(
+      this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+    ).toHaveCount(0, { timeout: 3000 });
   }
 
   /**

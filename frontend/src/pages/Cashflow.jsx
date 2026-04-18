@@ -30,10 +30,12 @@ const { Title } = Typography;
 export default function Cashflow() {
   const [transactions, setTransactions] = useState([]);
   const [closures, setClosures] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [summary, setSummary] = useState({ ingresos: 0, egresos: 0, balance: 0 });
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [tipoValue, setTipoValue] = useState(undefined);
   const [form] = Form.useForm();
   const { message } = App.useApp();
 
@@ -67,10 +69,20 @@ export default function Cashflow() {
     }
   }, [message]);
 
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await api.get("/cashflow/cash-categories/");
+      setCategories(res.data.results || res.data);
+    } catch {
+      message.error("Error al cargar categorias");
+    }
+  }, [message]);
+
   useEffect(() => {
     fetchTransactions();
     fetchClosures();
-  }, [fetchTransactions, fetchClosures]);
+    fetchCategories();
+  }, [fetchTransactions, fetchClosures, fetchCategories]);
 
   const openCreate = () => {
     form.resetFields();
@@ -254,6 +266,10 @@ export default function Cashflow() {
             rules={[{ required: true, message: "Seleccione el tipo" }]}
           >
             <Select
+              onChange={(val) => {
+                setTipoValue(val);
+                form.setFieldValue("categoria", undefined);
+              }}
               options={[
                 { value: "INGRESO", label: "Ingreso" },
                 { value: "EGRESO", label: "Egreso" },
@@ -263,17 +279,13 @@ export default function Cashflow() {
           <Form.Item
             name="categoria"
             label="Categoria"
-            rules={[{ required: true, message: "Ingrese la categoria" }]}
+            rules={[{ required: true, message: "Seleccione la categoria" }]}
           >
             <Select
-              options={[
-                { value: "PENSION", label: "Pension" },
-                { value: "MATRICULA", label: "Matricula" },
-                { value: "MATERIAL", label: "Material" },
-                { value: "PLANILLA", label: "Planilla" },
-                { value: "SERVICIOS", label: "Servicios" },
-                { value: "OTROS", label: "Otros" },
-              ]}
+              placeholder="Seleccione categoria"
+              options={categories
+                .filter((c) => !tipoValue || c.tipo === tipoValue)
+                .map((c) => ({ value: c.id, label: c.nombre }))}
             />
           </Form.Item>
           <Form.Item

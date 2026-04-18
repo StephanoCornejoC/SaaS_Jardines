@@ -67,12 +67,12 @@ export class CashflowPage {
 
     // Modal de nueva transaccion
     this.modal = page.locator('.ant-modal', { hasText: 'Nueva Transaccion' });
-    this.tipoSelect = this.modal.locator('.ant-select').filter({
-      has: this.modal.locator('.ant-form-item-label', { hasText: 'Tipo' }),
-    });
-    this.categoriaSelect = this.modal.locator('.ant-select').filter({
-      has: this.modal.locator('.ant-form-item-label', { hasText: 'Categoria' }),
-    });
+    // Los Select del modal se localizan usando getByRole('combobox') con el aria-label del campo.
+    // Ant Design 5 Form.Item con label "Tipo" genera un combobox con aria-label "* Tipo".
+    // Clickeamos el .ant-select-selector (elemento clickable) que es padre del combobox.
+    // Usamos nth(0) para Tipo y nth(1) para Categoria, que son los primeros dos selects del modal.
+    this.tipoSelect = this.modal.locator('.ant-select').nth(0);
+    this.categoriaSelect = this.modal.locator('.ant-select').nth(1);
     this.descripcionTextarea = this.modal.getByLabel('Descripcion');
     this.montoInput = this.modal.locator('.ant-input-number-input');
     this.fechaInput = this.modal.locator('.ant-picker input');
@@ -135,6 +135,10 @@ export class CashflowPage {
   }
 
   async getTransactionCount(): Promise<number> {
+    // Wait for any data loading spinner to disappear before counting
+    await expect(this.page.locator('.ant-spin-spinning')).toHaveCount(0, { timeout: 10000 });
+    // Small stabilization wait for the table to render its current rows
+    await this.page.waitForTimeout(300);
     return await this.transactionRows.count();
   }
 

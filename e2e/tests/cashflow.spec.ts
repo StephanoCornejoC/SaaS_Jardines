@@ -52,7 +52,7 @@ test.describe('Flujo de Caja', () => {
     // Llenar el formulario de transaccion
     await cashflowPage.fillTransactionForm({
       tipo: 'Ingreso',
-      categoria: 'Otros',
+      categoria: 'Pensiones',
       descripcion: descripcionUnica,
       monto: 150.5,
       fecha: '08/04/2026',

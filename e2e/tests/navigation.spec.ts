@@ -45,8 +45,8 @@ test.describe('Navegacion con sesion activa', () => {
       // Verificar que la URL cambio correctamente
       await expect(page).toHaveURL(item.expectedUrl, { timeout: 10000 });
 
-      // Verificar que la pagina cargo (el Spin de carga desaparecio)
-      await expect(page.locator('.ant-spin-spinning')).toBeHidden({ timeout: 10000 });
+      // Verificar que la pagina cargo (ningun Spin de carga debe quedar visible)
+      await expect(page.locator('.ant-spin-spinning')).toHaveCount(0, { timeout: 10000 });
     }
   });
 

@@ -2,7 +2,6 @@ import io
 from datetime import date
 
 import qrcode
-from django.core.files.base import ContentFile
 
 from apps.students.models import Student
 
@@ -12,8 +11,7 @@ from .models import MonthlyFee, Payment
 def generate_yape_qr(student, payment):
     """
     Genera un codigo QR con la informacion del pago para Yape/Plin.
-    Guarda la imagen en el campo qr_code del payment.
-    Retorna el path de la imagen guardada.
+    Retorna los bytes PNG directamente (sin guardar en filesystem).
     """
     qr_text = (
         f"Pension {student.nombres} {student.apellidos} "
@@ -36,10 +34,7 @@ def generate_yape_qr(student, payment):
     img.save(buffer, format="PNG")
     buffer.seek(0)
 
-    filename = f"qr_payment_{student.dni}_{payment.mes}_{payment.anio}.png"
-    payment.qr_code.save(filename, ContentFile(buffer.read()), save=True)
-
-    return payment.qr_code.url
+    return buffer.getvalue()
 
 
 def generate_monthly_payments(anio_escolar, mes):

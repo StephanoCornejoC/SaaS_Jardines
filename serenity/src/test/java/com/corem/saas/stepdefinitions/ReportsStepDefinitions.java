@@ -78,11 +78,6 @@ public class ReportsStepDefinitions {
         );
     }
 
-    @Y("aparece el mensaje de exito {string}")
-    public void mensajeExitoReporte(String mensaje) {
-        actor.should(seeThat(TheToastMessage.text(), containsString(mensaje)));
-    }
-
     @Y("cuando la descarga completa el boton vuelve al estado normal")
     public void botonVuelveNormal() {
         try { Thread.sleep(5000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }

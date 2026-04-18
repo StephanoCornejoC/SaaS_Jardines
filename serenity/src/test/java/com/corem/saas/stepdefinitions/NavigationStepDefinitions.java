@@ -108,14 +108,4 @@ public class NavigationStepDefinitions {
         );
     }
 
-    @Entonces("soy redirigido al dashboard")
-    public void redirigidoAlDashboardNav() {
-        actor.attemptsTo(
-            WaitUntil.the(
-                Target.the("heading dashboard").locatedBy("h1, h2, h3, h4").containingText("Dashboard"),
-                WebElementStateMatchers.isVisible()
-            ).forNoMoreThan(Duration.ofSeconds(10))
-        );
-        actor.should(seeThat(ThePageUrl.currentUrl(), containsString("dashboard")));
-    }
 }

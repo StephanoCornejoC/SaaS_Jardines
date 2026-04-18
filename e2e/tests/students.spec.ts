@@ -129,7 +129,7 @@ test.describe('Alumnos - Lista y CRUD', () => {
     // Verificar que el modal muestra los datos del alumno (modo edicion)
     await expect(studentsPage.modalTitle).toHaveText('Editar Alumno');
 
-    // Modificar el nombre
+    // Modificar el nombre (los demas campos estan pre-llenados correctamente)
     await studentsPage.nombresInput.clear();
     await studentsPage.nombresInput.fill('Maria Elena');
 

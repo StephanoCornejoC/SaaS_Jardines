@@ -15,6 +15,7 @@ import {
   Typography,
 } from "antd";
 import { PlusOutlined, SearchOutlined, EyeOutlined } from "@ant-design/icons";
+import dayjs from "dayjs";
 import api from "../services/api";
 
 const { Title } = Typography;
@@ -58,9 +59,13 @@ export default function Students() {
 
   const openEdit = (record) => {
     setEditingStudent(record);
+    // Solo campos editables del formulario (evitar enviar computed fields al backend)
     form.setFieldsValue({
-      ...record,
-      fecha_nacimiento: undefined,
+      dni: record.dni,
+      nombres: record.nombres,
+      apellidos: record.apellidos,
+      fecha_nacimiento: record.fecha_nacimiento ? dayjs(record.fecha_nacimiento) : null,
+      genero: record.genero,
     });
     setModalOpen(true);
   };

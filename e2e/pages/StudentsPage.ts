@@ -51,9 +51,8 @@ export class StudentsPage {
     // El Input con placeholder "Buscar por nombre o DNI"
     this.searchInput = page.getByPlaceholder('Buscar por nombre o DNI');
 
-    // El Select de estado: Ant Design Select no es un <select> nativo.
-    // Se identifica por el placeholder visible en el trigger del Select.
-    this.estadoFilterSelect = page.locator('.ant-select', { hasText: 'Estado' }).first();
+    // El Select de estado: buscar el trigger por placeholder "Estado"
+    this.estadoFilterSelect = page.locator('.ant-select:has(.ant-select-selection-placeholder:has-text("Estado"))').first();
 
     this.studentsTable = page.locator('.ant-table-wrapper');
     this.tableRows = page.locator('.ant-table-tbody tr.ant-table-row');
@@ -70,7 +69,11 @@ export class StudentsPage {
     this.nombresInput = this.modal.getByLabel('Nombres');
     this.apellidosInput = this.modal.getByLabel('Apellidos');
     this.fechaNacimientoInput = this.modal.getByLabel('Fecha de Nacimiento');
-    this.generoSelect = this.modal.locator('.ant-select', { hasText: 'Genero' }).first();
+    // El Select de Genero: buscar por el Form.Item con label "Genero" y dentro el select
+    this.generoSelect = this.modal
+      .locator('.ant-form-item')
+      .filter({ has: page.locator('label', { hasText: 'Genero' }) })
+      .locator('.ant-select');
   }
 
   async goto(): Promise<void> {
@@ -169,6 +172,11 @@ export class StudentsPage {
 
   async deleteStudent(rowIndex: number = 0): Promise<void> {
     await this.tableRows.nth(rowIndex).getByRole('button', { name: 'Eliminar' }).click();
+    // Confirmar el Popconfirm de Ant Design
+    await this.page
+      .locator('.ant-popconfirm')
+      .getByRole('button', { name: /Si, eliminar/i })
+      .click();
   }
 
   async getRowCount(): Promise<number> {

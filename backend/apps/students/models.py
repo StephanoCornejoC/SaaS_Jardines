@@ -29,7 +29,9 @@ class Student(models.Model):
         verbose_name="Aula",
     )
     estado = models.CharField(max_length=10, choices=Estado.choices, default=Estado.ACTIVO)
-    fecha_ingreso = models.DateField(verbose_name="Fecha de ingreso")
+    fecha_ingreso = models.DateField(
+        default=date.today, verbose_name="Fecha de ingreso"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

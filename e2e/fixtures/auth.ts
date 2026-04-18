@@ -38,7 +38,7 @@ export class ApiHelper {
   }
 
   async getAuthToken(): Promise<string> {
-    const res = await this.request.post(`${this.baseUrl}/api/auth/token/`, {
+    const res = await this.request.post(`${this.baseUrl}/api/v1/auth/token/`, {
       data: {
         email: process.env.TEST_EMAIL || 'admin@garabato.test',
         password: process.env.TEST_PASSWORD || 'admin123',
@@ -50,6 +50,7 @@ export class ApiHelper {
 
   async createStudent(token: string, data?: Partial<StudentData>): Promise<StudentData> {
     const dni = data?.dni || `9${Date.now().toString().slice(-7)}`;
+    const today = new Date().toISOString().slice(0, 10);
     const payload: StudentData = {
       dni,
       nombres: data?.nombres || 'TestNombre',
@@ -57,9 +58,10 @@ export class ApiHelper {
       fecha_nacimiento: data?.fecha_nacimiento || '2020-01-15',
       genero: data?.genero || 'M',
       estado: data?.estado || 'ACTIVO',
+      fecha_ingreso: today,
     };
 
-    const res = await this.request.post(`${this.baseUrl}/api/students/`, {
+    const res = await this.request.post(`${this.baseUrl}/api/v1/students/`, {
       data: payload,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
     });
@@ -71,13 +73,13 @@ export class ApiHelper {
   }
 
   async deleteStudent(token: string, id: number): Promise<void> {
-    await this.request.delete(`${this.baseUrl}/api/students/${id}/`, {
+    await this.request.delete(`${this.baseUrl}/api/v1/students/${id}/`, {
       headers: { Authorization: `Bearer ${token}` },
     });
   }
 
   async getClassrooms(token: string): Promise<ClassroomData[]> {
-    const res = await this.request.get(`${this.baseUrl}/api/classrooms/?estado=ACTIVO`, {
+    const res = await this.request.get(`${this.baseUrl}/api/v1/classrooms/?estado=ACTIVO`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -85,7 +87,7 @@ export class ApiHelper {
   }
 
   async getPendingPayments(token: string): Promise<PaymentData[]> {
-    const res = await this.request.get(`${this.baseUrl}/api/payments/?estado=PENDIENTE`, {
+    const res = await this.request.get(`${this.baseUrl}/api/v1/payments/?estado=PENDIENTE`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     const data = await res.json();
@@ -104,6 +106,7 @@ export interface StudentData {
   fecha_nacimiento: string;
   genero: 'M' | 'F';
   estado?: 'ACTIVO' | 'RETIRADO' | 'EGRESADO';
+  fecha_ingreso?: string;
 }
 
 export interface ClassroomData {

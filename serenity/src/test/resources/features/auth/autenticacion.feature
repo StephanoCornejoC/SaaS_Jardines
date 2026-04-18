@@ -6,14 +6,14 @@ Característica: Autenticacion de usuarios
   Para proteger la informacion del sistema
 
   Antecedentes:
-    Dado que el sistema COREM esta disponible en http://localhost:3000
+    Dado que el sistema COREM esta disponible en "http://localhost:3000"
 
   @login @tc-auth-01
   Escenario: TC-AUTH-01 Login exitoso redirige al dashboard
     Dado que soy un usuario sin sesion activa
     Y navego a la pagina de login
     Entonces veo los campos de email, contrasena y el boton de ingresar
-    Cuando ingreso las credenciales validas "admin@test.com" y "TestPass1234"
+    Cuando ingreso las credenciales validas "admin@garabato.com" y "Admin1234!"
     Y hago clic en el boton Ingresar
     Entonces soy redirigido al dashboard
     Y el encabezado "Dashboard" es visible

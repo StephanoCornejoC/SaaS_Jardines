@@ -13,14 +13,17 @@ import { test, expect } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
 
-// IMPORTANTE: estos tests ignoran el storageState del proyecto
-// porque necesitan empezar sin sesion activa.
-test.use({ storageState: { cookies: [], origins: [] } });
+// NOTA: los tests de login/registro necesitan empezar SIN sesion,
+// el test de logout SI necesita sesion. Configuramos storageState
+// a nivel de describe (ver describe('Autenticacion') mas abajo).
 
 const TEST_EMAIL = process.env.TEST_EMAIL || 'admin@garabato.test';
 const TEST_PASSWORD = process.env.TEST_PASSWORD || 'admin123';
 
 test.describe('Autenticacion', () => {
+  // Estos tests prueban el login mismo, empiezan sin sesion
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test('TC-AUTH-01: login exitoso redirige al dashboard', async ({ page }) => {
     const loginPage = new LoginPage(page);
     await loginPage.goto();
@@ -55,7 +58,8 @@ test.describe('Autenticacion', () => {
     await loginPage.login('usuario@invalido.com', 'contrasenaMala123');
 
     // El mensaje de error de Ant Design (message.error) debe aparecer
-    await loginPage.expectAntMessageError('Credenciales incorrectas');
+    // El backend retorna un detail con "credenciales" que mostramos tal cual
+    await loginPage.expectAntMessageError('credenciales');
 
     // Debe permanecer en la pagina de login
     await expect(page).toHaveURL(/.*login/);

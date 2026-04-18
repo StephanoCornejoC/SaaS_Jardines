@@ -52,7 +52,7 @@ export default function Attendance() {
       try {
         const fecha = selectedDate.format("YYYY-MM-DD");
         const res = await api.get("/attendance/", {
-          params: { aula: selectedClassroom, fecha },
+          params: { classroom: selectedClassroom, fecha },
         });
         const data = res.data.results || res.data;
 
@@ -65,7 +65,7 @@ export default function Attendance() {
 
         // Get students for the classroom
         const studRes = await api.get("/students/", {
-          params: { aula: selectedClassroom, estado: "ACTIVO" },
+          params: { classroom: selectedClassroom, estado: "ACTIVO" },
         });
         setStudents(studRes.data.results || studRes.data);
       } catch {
@@ -87,17 +87,17 @@ export default function Attendance() {
       return;
     }
 
-    const registros = students.map((s) => ({
-      alumno: s.id,
+    const asistencias = students.map((s) => ({
+      student_id: s.id,
       estado: attendanceData[s.id] || "PRESENTE",
     }));
 
     setSaving(true);
     try {
       await api.post("/attendance/registro-masivo/", {
-        aula: selectedClassroom,
+        classroom_id: selectedClassroom,
         fecha: selectedDate.format("YYYY-MM-DD"),
-        registros,
+        asistencias,
       });
       message.success("Asistencia guardada");
     } catch (err) {

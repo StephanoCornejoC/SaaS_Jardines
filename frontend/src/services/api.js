@@ -34,12 +34,19 @@ function processQueue(error, token = null) {
   refreshQueue = [];
 }
 
+// Endpoints donde NO queremos la logica de refresh (login/refresh mismos)
+const SKIP_401_INTERCEPTOR = ["/auth/token/", "/auth/token/refresh/"];
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    // Si el 401 viene del endpoint de login mismo, no intentamos refresh ni redirigimos
+    const requestUrl = originalRequest?.url || "";
+    const isAuthEndpoint = SKIP_401_INTERCEPTOR.some((u) => requestUrl.includes(u));
+
+    if (error.response?.status === 401 && !originalRequest._retry && !isAuthEndpoint) {
       originalRequest._retry = true;
       const refreshToken = localStorage.getItem("refresh_token");
 

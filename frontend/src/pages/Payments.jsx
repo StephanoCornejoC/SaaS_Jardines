@@ -91,7 +91,10 @@ export default function Payments() {
       if (values.fecha_pago) {
         values.fecha_pago = values.fecha_pago.format("YYYY-MM-DD");
       }
-      await api.patch(`/payments/${selectedPayment.id}/registrar-pago/`, values);
+      await api.patch(`/payments/${selectedPayment.id}/registrar-pago/`, {
+        estado: "PAGADO",
+        ...values,
+      });
       message.success("Pago registrado");
       setPayModalOpen(false);
       fetchPayments();

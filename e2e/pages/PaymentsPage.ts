@@ -8,14 +8,12 @@
  * Modal para registrar pago (monto, fecha, metodo, observaciones).
  * Boton QR que abre modal con imagen.
  *
- * DATA-TESTID PENDIENTES DE AGREGAR AL FRONTEND:
- *   - data-testid="payments-table"           en el Table
- *   - data-testid="select-mes-filtro"        en el Select de mes
- *   - data-testid="select-anio-filtro"       en el Select de ano
- *   - data-testid="select-estado-filtro"     en el Select de estado
- *   - data-testid="modal-registrar-pago"     en el Modal de pago
- *   - data-testid="modal-qr"                 en el Modal del QR
- *   - data-testid="qr-image"                 en la img del QR
+ * NOTAS DE SELECTORES:
+ *   - El select "Ano" tiene valor por defecto (currentYear), no muestra placeholder.
+ *     Se localiza por posicion: es el 2do .ant-select dentro del Space de filtros.
+ *   - Los selects del modal se localizan via el .ant-form-item que contiene el label,
+ *     no filtrando el .ant-select por .ant-form-item-label (que es sibling, no descendant).
+ *   - El modal QR usa modal.info de Ant Design: el titulo aparece en .ant-modal-confirm-title.
  */
 import { type Locator, type Page, expect } from '@playwright/test';
 
@@ -25,7 +23,7 @@ export class PaymentsPage {
   readonly heading: Locator;
   readonly paymentsTable: Locator;
   readonly tableRows: Locator;
-  // Filtros: cada Select se identifica por su placeholder visible
+  // Filtros: los tres selects en el Space de filtros (por posicion/placeholder)
   readonly mesFilterSelect: Locator;
   readonly anioFilterSelect: Locator;
   readonly estadoFilterSelect: Locator;
@@ -47,37 +45,40 @@ export class PaymentsPage {
     this.paymentsTable = page.locator('.ant-table-wrapper');
     this.tableRows = page.locator('.ant-table-tbody tr.ant-table-row');
 
-    // Los Select de filtro: Ant Design coloca el placeholder en .ant-select-selection-placeholder
-    this.mesFilterSelect = page
-      .locator('.ant-select')
-      .filter({ has: page.locator('.ant-select-selection-placeholder', { hasText: 'Mes' }) });
-    this.anioFilterSelect = page
-      .locator('.ant-select')
-      .filter({ has: page.locator('.ant-select-selection-placeholder', { hasText: 'Ano' }) });
-    this.estadoFilterSelect = page
-      .locator('.ant-select')
-      .filter({ has: page.locator('.ant-select-selection-placeholder', { hasText: 'Estado' }) });
+    // Los tres selects de filtro estan en un Space consecutivo antes de la tabla.
+    // "Mes": el 1er .ant-select de la pagina
+    this.mesFilterSelect = page.locator('.ant-select').nth(0);
 
-    // Modal de pago
+    // "Ano": tiene valor por defecto (currentYear), NO muestra placeholder.
+    // Se localiza como el 2do .ant-select de la pagina (Space: Mes[0], Ano[1], Estado[2]).
+    this.anioFilterSelect = page.locator('.ant-select').nth(1);
+
+    // "Estado": el 3er .ant-select de la pagina (puede tener valor o placeholder)
+    this.estadoFilterSelect = page.locator('.ant-select').nth(2);
+
+    // Modal de pago: localizamos via el Form.Item que contiene la label, luego el select dentro
     this.payModal = page.locator('.ant-modal', { hasText: 'Registrar Pago' });
     this.payModalTitle = this.payModal.locator('.ant-modal-title');
     this.montoInput = this.payModal.locator('.ant-input-number-input');
     this.fechaPagoInput = this.payModal.getByLabel('Fecha de Pago');
+    // El Form.Item con label "Metodo de Pago" contiene el .ant-select
     this.metodoPagoSelect = this.payModal
-      .locator('.ant-select')
-      .filter({ has: this.payModal.locator('.ant-form-item-label', { hasText: 'Metodo' }) });
+      .locator('.ant-form-item', { has: page.locator('label', { hasText: 'Metodo de Pago' }) })
+      .locator('.ant-select');
     this.observacionesInput = this.payModal.getByLabel('Observaciones');
     this.payModalOkButton = this.payModal.locator('.ant-modal-footer button.ant-btn-primary');
 
-    // Modal de QR (creado por modal.info de Ant Design)
-    this.qrModal = page.locator('.ant-modal', { hasText: 'QR de Pago' });
+    // Modal de QR (creado por modal.info de Ant Design).
+    // modal.info usa .ant-modal-confirm con titulo en .ant-modal-confirm-title
+    this.qrModal = page.locator('.ant-modal-confirm', { hasText: 'QR de Pago' });
     this.qrImage = this.qrModal.locator('img[alt="QR Code"]');
   }
 
   async goto(): Promise<void> {
     await this.page.goto('/pensiones');
     await expect(this.heading).toBeVisible({ timeout: 10000 });
-    await expect(this.page.locator('.ant-spin-spinning')).toBeHidden({ timeout: 10000 });
+    // Esperar que los spinners desaparezcan (puede haber mas de uno)
+    await expect(this.page.locator('.ant-spin-spinning')).toHaveCount(0, { timeout: 10000 });
   }
 
   /**
@@ -89,27 +90,26 @@ export class PaymentsPage {
       .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
       .getByTitle(optionText)
       .click();
-    await expect(this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')).toBeHidden();
+    await expect(this.page.locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')).toHaveCount(0, { timeout: 5000 });
   }
 
   async filterByMes(mesLabel: string): Promise<void> {
     await this.selectAntOption(this.mesFilterSelect, mesLabel);
-    await expect(this.page.locator('.ant-spin-spinning')).toBeHidden({ timeout: 10000 });
+    await expect(this.page.locator('.ant-spin-spinning')).toHaveCount(0, { timeout: 10000 });
   }
 
   async filterByAnio(anio: number): Promise<void> {
     await this.selectAntOption(this.anioFilterSelect, String(anio));
-    await expect(this.page.locator('.ant-spin-spinning')).toBeHidden({ timeout: 10000 });
+    await expect(this.page.locator('.ant-spin-spinning')).toHaveCount(0, { timeout: 10000 });
   }
 
   async filterByEstado(estado: 'Pendiente' | 'Pagado' | 'Vencido'): Promise<void> {
     await this.selectAntOption(this.estadoFilterSelect, estado);
-    await expect(this.page.locator('.ant-spin-spinning')).toBeHidden({ timeout: 10000 });
+    await expect(this.page.locator('.ant-spin-spinning')).toHaveCount(0, { timeout: 10000 });
   }
 
   /**
-   * Abre el modal de registrar pago para la primera fila con estado PENDIENTE.
-   * El boton "Registrar Pago" solo aparece si el estado no es PAGADO.
+   * Abre el modal de registrar pago para una fila de la tabla.
    */
   async clickRegistrarPago(rowIndex: number = 0): Promise<void> {
     await this.tableRows.nth(rowIndex).getByRole('button', { name: 'Registrar Pago' }).click();
@@ -149,12 +149,12 @@ export class PaymentsPage {
   }
 
   async closeQrModal(): Promise<void> {
-    await this.qrModal.getByRole('button', { name: 'OK' }).click();
+    // Ant Design con locale es_ES usa "Aceptar" en vez de "OK"
+    await this.qrModal.getByRole('button', { name: /Aceptar|OK/ }).click();
     await expect(this.qrModal).toBeHidden();
   }
 
   async getRowEstado(rowIndex: number): Promise<string> {
-    // La columna Estado tiene un Tag de Ant Design
     return (
       (await this.tableRows.nth(rowIndex).locator('.ant-tag').textContent()) || ''
     );

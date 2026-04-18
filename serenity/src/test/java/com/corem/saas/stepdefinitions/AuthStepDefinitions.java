@@ -33,8 +33,8 @@ public class AuthStepDefinitions {
 
     private Actor actor;
 
-    @Dado("que el sistema COREM esta disponible en http://localhost:3000")
-    public void sistemaCOREMDisponible() {
+    @Dado("que el sistema COREM esta disponible en {string}")
+    public void sistemaCOREMDisponible(String url) {
         // Precondicion documentada. No requiere accion.
     }
 
