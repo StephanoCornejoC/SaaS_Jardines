@@ -19,18 +19,18 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
 
-    <!-- Serenity -->
-    <serenity.version>4.1.20</serenity.version>
-    <serenity.cucumber.version>4.1.20</serenity.cucumber.version>
+    <!-- Serenity 4.2.x es compatible con Selenium 4.23+ -->
+    <serenity.version>4.2.4</serenity.version>
+    <serenity.cucumber.version>4.2.4</serenity.cucumber.version>
 
     <!-- Cucumber -->
-    <cucumber.version>7.15.0</cucumber.version>
+    <cucumber.version>7.18.0</cucumber.version>
 
     <!-- JUnit 5 -->
     <junit.version>5.10.2</junit.version>
 
-    <!-- Selenium -->
-    <selenium.version>4.18.1</selenium.version>
+    <!-- Selenium - compatible con Serenity 4.2.x -->
+    <selenium.version>4.23.0</selenium.version>
 
     <!-- WebDriverManager -->
     <webdrivermanager.version>5.8.0</webdrivermanager.version>
@@ -45,6 +45,19 @@
     <maven.surefire.version>3.2.5</maven.surefire.version>
     <maven.failsafe.version>3.2.5</maven.failsafe.version>
   </properties>
+
+  <!-- Fuerza versiones transitivas para evitar conflictos -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.seleniumhq.selenium</groupId>
+        <artifactId>selenium-bom</artifactId>
+        <version>${selenium.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
   <dependencies>
 
