@@ -131,13 +131,12 @@ class TestMonthlyFeeViewSet:
         assert response.data["monto_mensual"] == "400.00"
 
     def test_generar_qr(self, auth_client, admin_user):
-        """Test QR generation endpoint returns 201 (or handles gracefully)."""
+        """El endpoint QR ahora retorna HTTP 200 con image/png directamente."""
         payment = PaymentFactory()
         client = auth_client(admin_user)
-        # This may fail without qrcode library; we test the endpoint exists
-        response = client.post(
+        response = client.get(
             f"/api/v1/payments/{payment.pk}/generar-qr/",
-            format="json",
         )
-        # Accept 201 (success) or 500 (if qrcode not installed in test env)
-        assert response.status_code in [201, 500]
+        assert response.status_code == 200
+        assert response["Content-Type"].startswith("image/png")
+        assert len(response.content) > 100  # PNG válido no vacío

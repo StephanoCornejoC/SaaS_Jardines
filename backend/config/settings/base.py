@@ -144,7 +144,8 @@ SIMPLE_JWT = {
 # --- DRF ---
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # Single-session enforcement: solo un login activo por usuario
+        "apps.users.single_session.JWTSingleSessionAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",

@@ -138,8 +138,11 @@ def auth_client(tenant):
     """
     def _make_client(user):
         client = APIClient()
-        refresh = RefreshToken.for_user(user)
-        client.credentials(HTTP_AUTHORIZATION=f"Bearer {refresh.access_token}")
+        # Use the single-session serializer so the token includes the "sid" claim
+        from apps.users.single_session import SingleSessionTokenObtainPairSerializer
+        token = SingleSessionTokenObtainPairSerializer.get_token(user)
+        access = token.access_token
+        client.credentials(HTTP_AUTHORIZATION=f"Bearer {access}")
         # Set tenant header for django-tenants
         client.defaults["HTTP_HOST"] = "test.localhost"
         return client

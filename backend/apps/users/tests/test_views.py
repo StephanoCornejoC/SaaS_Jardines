@@ -44,11 +44,13 @@ class TestTokenEndpoints:
 
     def test_token_refresh(self, auth_client, admin_user):
         from rest_framework.test import APIClient
-        from rest_framework_simplejwt.tokens import RefreshToken
+
+        from apps.users.single_session import SingleSessionTokenObtainPairSerializer
 
         client = APIClient()
         client.defaults["HTTP_HOST"] = "test.localhost"
-        refresh = RefreshToken.for_user(admin_user)
+        # Usar el serializer con sesión única para que el refresh traiga el claim sid
+        refresh = SingleSessionTokenObtainPairSerializer.get_token(admin_user)
         response = client.post(
             "/api/v1/auth/token/refresh/",
             {"refresh": str(refresh)},

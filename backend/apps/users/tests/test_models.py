@@ -50,14 +50,15 @@ class TestUserCreation:
         )
         assert user.email == "Test@example.com"
 
-    def test_default_role_is_profesor(self, tenant):
+    def test_default_role_is_admin_jardin(self, tenant):
+        """El producto comercial asigna ADMIN_JARDIN por defecto."""
         user = User.objects.create_user(
             email="default@test.com",
             password="SecurePass99",
             first_name="Default",
             last_name="Role",
         )
-        assert user.role == User.Role.PROFESOR
+        assert user.role == User.Role.ADMIN_JARDIN
 
 
 class TestUserRoleProperties:

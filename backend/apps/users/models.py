@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
@@ -7,6 +9,7 @@ from .managers import CustomUserManager
 class User(AbstractUser):
     """
     Usuario personalizado. Usa email como campo de autenticación en lugar de username.
+    El producto comercial solo permite un rol (ADMIN_JARDIN) y una sesión activa por usuario.
     """
 
     class Role(models.TextChoices):
@@ -24,9 +27,18 @@ class User(AbstractUser):
         "Rol",
         max_length=20,
         choices=Role.choices,
-        default=Role.PROFESOR,
+        default=Role.ADMIN_JARDIN,
     )
     telefono = models.CharField("Teléfono", max_length=20, blank=True, null=True)
+
+    # SESSION_ENFORCEMENT: solo una sesión activa por usuario.
+    # Al hacer login se genera un nuevo UUID; los tokens con UUIDs anteriores
+    # se consideran inválidos y fuerzan cierre de sesión remota.
+    active_session_id = models.UUIDField(
+        "ID de sesión activa",
+        default=uuid.uuid4,
+        help_text="UUID de la sesión actualmente activa. Al hacer login se regenera.",
+    )
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
