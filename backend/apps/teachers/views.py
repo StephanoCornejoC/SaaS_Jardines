@@ -19,7 +19,6 @@ class TeacherViewSet(viewsets.ModelViewSet):
     queryset = Teacher.objects.prefetch_related("contracts__payments")
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["nombres", "apellidos", "dni"]
-    filterset_fields = ["activo"]
     ordering_fields = ["apellidos", "nombres", "fecha_ingreso"]
     ordering = ["apellidos"]
 

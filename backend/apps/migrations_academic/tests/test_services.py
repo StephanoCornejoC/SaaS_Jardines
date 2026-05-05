@@ -23,10 +23,10 @@ class TestPreviewMigration:
     def test_returns_correct_counts(self, tenant):
         current_year = date.today().year
         # Create classrooms for current year
-        aula_3 = ClassroomFactory(nivel_edad=3, anio_escolar=current_year)
-        aula_5 = ClassroomFactory(nivel_edad=5, anio_escolar=current_year)
-        # Create classrooms for next year
-        ClassroomFactory(nivel_edad=4, anio_escolar=current_year + 1)
+        aula_3 = ClassroomFactory(nivel_edad=3)
+        aula_5 = ClassroomFactory(nivel_edad=5)
+        # Aula nivel 4 (destino para los de aula_3)
+        ClassroomFactory(nivel_edad=4)
 
         # Students in aula_3 should promote
         s1 = StudentFactory(classroom=aula_3, estado="ACTIVO")
@@ -47,22 +47,22 @@ class TestPreviewMigration:
 class TestExecuteMigration:
     def test_promotes_students(self, tenant, superadmin_user):
         current_year = date.today().year
-        aula_3 = ClassroomFactory(nivel_edad=3, anio_escolar=current_year)
-        aula_4_next = ClassroomFactory(nivel_edad=4, anio_escolar=current_year + 1)
+        aula_3 = ClassroomFactory(nivel_edad=3)
+        aula_4 = ClassroomFactory(nivel_edad=4)
 
         student = StudentFactory(classroom=aula_3, estado="ACTIVO")
 
         migration = execute_migration(current_year, superadmin_user)
 
         student.refresh_from_db()
-        assert student.classroom == aula_4_next
+        assert student.classroom == aula_4
         assert student.estado == "ACTIVO"
         assert migration.status == "EJECUTADO"
         assert migration.total_migrados == 1
 
     def test_graduates_level_5(self, tenant, superadmin_user):
         current_year = date.today().year
-        aula_5 = ClassroomFactory(nivel_edad=5, anio_escolar=current_year)
+        aula_5 = ClassroomFactory(nivel_edad=5)
         student = StudentFactory(classroom=aula_5, estado="ACTIVO")
 
         migration = execute_migration(current_year, superadmin_user)
@@ -73,8 +73,8 @@ class TestExecuteMigration:
 
     def test_creates_migration_log(self, tenant, superadmin_user):
         current_year = date.today().year
-        aula_3 = ClassroomFactory(nivel_edad=3, anio_escolar=current_year)
-        ClassroomFactory(nivel_edad=4, anio_escolar=current_year + 1)
+        aula_3 = ClassroomFactory(nivel_edad=3)
+        ClassroomFactory(nivel_edad=4)
         StudentFactory(classroom=aula_3, estado="ACTIVO")
 
         migration = execute_migration(current_year, superadmin_user)
@@ -86,8 +86,8 @@ class TestExecuteMigration:
 
     def test_creates_detail_records(self, tenant, superadmin_user):
         current_year = date.today().year
-        aula_3 = ClassroomFactory(nivel_edad=3, anio_escolar=current_year)
-        aula_4_next = ClassroomFactory(nivel_edad=4, anio_escolar=current_year + 1)
+        aula_3 = ClassroomFactory(nivel_edad=3)
+        aula_4 = ClassroomFactory(nivel_edad=4)
         student = StudentFactory(classroom=aula_3, estado="ACTIVO")
 
         migration = execute_migration(current_year, superadmin_user)
@@ -97,7 +97,7 @@ class TestExecuteMigration:
         detail = details.first()
         assert detail.student == student
         assert detail.aula_origen == aula_3
-        assert detail.aula_destino == aula_4_next
+        assert detail.aula_destino == aula_4
         assert detail.estado_anterior == "ACTIVO"
         assert detail.estado_nuevo == "ACTIVO"
 
@@ -108,7 +108,7 @@ class TestCleanupGraduated:
         current_year = date.today().year
         past_year = current_year - years_ago
 
-        aula = ClassroomFactory(nivel_edad=5, anio_escolar=past_year)
+        aula = ClassroomFactory(nivel_edad=5)
         student = StudentFactory(estado="EGRESADO", classroom=None)
         guardian = GuardianFactory(student=student, es_principal=True)
         medical = MedicalRecordFactory(student=student)

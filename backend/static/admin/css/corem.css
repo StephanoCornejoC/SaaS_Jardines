@@ -1,0 +1,1125 @@
+/* COREM Admin — tema teal sobre el admin nativo de Django */
+
+:root {
+  --corem-primary: #0d9488;
+  --corem-primary-dark: #0f766e;
+  --corem-primary-light: #14b8a6;
+  --corem-bg: #f8fafc;
+  --corem-surface: #ffffff;
+  --corem-border: #e2e8f0;
+  --corem-text: #0f172a;
+  --corem-muted: #64748b;
+  --corem-accent: #ccfbf1;
+  --corem-radius: 8px;
+
+  /* Variables del admin Django */
+  --primary: var(--corem-primary);
+  --secondary: var(--corem-primary-dark);
+  --accent: var(--corem-accent);
+  --link-fg: var(--corem-primary);
+  --link-hover-color: var(--corem-primary-dark);
+  --link-selected-fg: var(--corem-primary-dark);
+  --header-bg: var(--corem-primary-dark);
+  --header-link-color: #ffffff;
+  --header-color: #ffffff;
+  --header-branding-color: #ffffff;
+  --button-bg: var(--corem-primary);
+  --button-fg: #ffffff;
+  --button-hover-bg: var(--corem-primary-dark);
+  --default-button-bg: var(--corem-primary);
+  --default-button-hover-bg: var(--corem-primary-dark);
+  --selected-bg: var(--corem-accent);
+  --selected-row: #f0fdfa;
+  --close-button-bg: #94a3b8;
+  --close-button-hover-bg: #64748b;
+  --body-fg: var(--corem-text);
+  --body-bg: var(--corem-bg);
+  --body-quiet-color: var(--corem-muted);
+  --body-loud-color: var(--corem-text);
+  --breadcrumbs-bg: var(--corem-surface);
+  --breadcrumbs-fg: var(--corem-muted);
+  --breadcrumbs-link-fg: var(--corem-primary);
+  --object-tools-bg: var(--corem-primary);
+  --object-tools-hover-bg: var(--corem-primary-dark);
+  --message-success-bg: #dcfce7;
+  --message-warning-bg: #fef3c7;
+  --message-error-bg: #fee2e2;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  background: var(--corem-bg);
+}
+
+/* Header */
+#header {
+  height: 56px;
+  background: linear-gradient(135deg, var(--corem-primary-dark) 0%, var(--corem-primary) 100%);
+  color: #fff;
+  border-bottom: none;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.15);
+}
+
+/* ── Branding con botón hamburguesa ─────────────────────────────────── */
+.corem-branding-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.corem-hamburger {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+  gap: 5px;
+  transition: background 0.15s;
+}
+.corem-hamburger:hover { background: rgba(255,255,255,0.15); }
+.corem-hamburger span {
+  display: block;
+  width: 22px;
+  height: 2.5px;
+  background: #fff;
+  border-radius: 2px;
+  transition: transform 0.2s, opacity 0.2s;
+}
+
+/* Ocultar el sidebar nativo de Django (lo reemplazamos con el drawer) */
+#nav-sidebar { display: none !important; }
+#main > #content { margin-left: 0 !important; max-width: 100% !important; }
+#toggle-nav-sidebar { display: none !important; }
+#header a:link, #header a:visited { color: #fff; }
+#site-name a { font-weight: 700; font-size: 17px; letter-spacing: 0.3px; }
+#user-tools { font-size: 12px; }
+#user-tools a { padding: 4px 8px; border-radius: 4px; }
+#user-tools a:hover { background: rgba(255,255,255,0.15); text-decoration: none; }
+
+/* Breadcrumbs ocultos (panel limpio, navegación va por el drawer) */
+div.breadcrumbs { display: none !important; }
+
+/* Content */
+#content { padding: 24px; }
+#content-main { background: transparent; }
+
+/* Module / cards */
+.module {
+  background: var(--corem-surface);
+  border: 1px solid var(--corem-border);
+  border-radius: var(--corem-radius);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.module h2, .module caption, .inline-group h2 {
+  background: var(--corem-primary-dark);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  padding: 10px 16px;
+  border-radius: var(--corem-radius) var(--corem-radius) 0 0;
+}
+
+/* Botones */
+.button, input[type=submit], input[type=button], .submit-row input, a.button {
+  background: var(--corem-primary);
+  color: #fff !important;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.button:hover, input[type=submit]:hover, .default:hover {
+  background: var(--corem-primary-dark);
+  text-decoration: none;
+}
+.button.default, input[type=submit].default {
+  background: var(--corem-primary);
+  font-weight: 700;
+}
+a.deletelink, .deletelink {
+  background: #ef4444 !important;
+  color: #fff !important;
+}
+a.deletelink:hover { background: #dc2626 !important; }
+
+/* Layout del changelist: aprovechar todo el ancho disponible
+   La estructura nativa de Django es:
+     #content #changelist .results (tabla) + #changelist-filter (sidebar derecho)
+   Lo dejamos como flex-row con el sidebar fijo a la derecha y la tabla flex:1. */
+#changelist { display: flex; flex-direction: row-reverse; gap: 14px; }
+#changelist .results,
+#changelist .actions,
+#changelist #toolbar,
+#changelist .paginator { flex: 1; min-width: 0; max-width: 100%; }
+
+/* Búsqueda + acciones full width */
+#changelist #toolbar { width: 100%; box-sizing: border-box; }
+
+/* Tablas */
+#changelist table,
+#result_list {
+  background: var(--corem-surface);
+  border: 1px solid var(--corem-border);
+  border-radius: var(--corem-radius);
+  border-spacing: 0;
+  border-collapse: separate;
+  overflow: hidden;
+  width: 100%;
+  table-layout: auto;
+}
+#changelist table thead th {
+  background: #f1f5f9;
+  color: var(--corem-text);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 10px 14px;
+  border-bottom: 2px solid var(--corem-border);
+  white-space: nowrap;
+}
+#changelist table thead th a { color: var(--corem-text); }
+#changelist table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+  vertical-align: middle;
+}
+/* Las celdas con badge no rompen línea */
+#changelist table tbody td span[style*="border-radius"] { white-space: nowrap; }
+#changelist table tbody tr:hover { background: var(--corem-accent); }
+
+/* Filtros laterales — más compactos, no rompen el layout */
+#changelist-filter {
+  background: var(--corem-surface);
+  border: 1px solid var(--corem-border);
+  border-radius: var(--corem-radius);
+  padding: 0;
+  width: 220px;
+  flex-shrink: 0;
+  align-self: flex-start;
+  position: sticky;
+  top: 14px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+#changelist-filter h2 {
+  background: var(--corem-primary-dark);
+  border-radius: var(--corem-radius) var(--corem-radius) 0 0;
+  padding: 10px 14px;
+  font-size: 12px;
+  margin: 0;
+}
+#changelist-filter h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--corem-muted);
+  padding: 10px 14px 4px;
+  margin: 0;
+}
+#changelist-filter ul { padding: 0 0 8px; margin: 0; list-style: none; }
+#changelist-filter li { padding: 3px 14px; }
+#changelist-filter li a { font-size: 12.5px; }
+#changelist-filter li.selected a { color: var(--corem-primary); font-weight: 600; }
+
+/* Search bar */
+#changelist-search input[type="text"] {
+  border: 1px solid var(--corem-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+#changelist-search input[type="submit"] { padding: 8px 14px; }
+
+/* Forms */
+form .aligned label { font-weight: 600; font-size: 13px; color: var(--corem-text); }
+form input[type=text], form input[type=email], form input[type=password],
+form input[type=url], form input[type=number], form textarea, form select {
+  border: 1px solid var(--corem-border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: #fff;
+}
+form input:focus, form textarea:focus, form select:focus {
+  border-color: var(--corem-primary);
+  outline: 2px solid rgba(13, 148, 136, 0.15);
+  outline-offset: 0;
+}
+
+/* Submit row */
+.submit-row {
+  background: var(--corem-surface);
+  border: 1px solid var(--corem-border);
+  border-radius: var(--corem-radius);
+  padding: 14px 16px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* Object tools (botones arriba a la derecha de listas) */
+.object-tools a {
+  background: var(--corem-primary);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+}
+.object-tools a:hover { background: var(--corem-primary-dark); }
+
+/* Mensajes */
+ul.messagelist li {
+  border-radius: var(--corem-radius);
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+/* ── Botón "Entrar →" en lista de Tenants ─────────────────────────── */
+.corem-operar-btn {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--corem-primary);
+  color: #fff !important;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.corem-operar-btn:hover {
+  background: var(--corem-primary-dark);
+  text-decoration: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   MODO JARDÍN — Banner, KPIs, Módulos, Tablas
+   El banner usa azul índigo para diferenciarse visualmente del teal
+   del panel COREM.
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Banner superior del jardín ─────────────────────────────────────── */
+.jardin-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  background: linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 100%);
+  color: #fff;
+  border-radius: 10px;
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.jardin-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.jardin-banner-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+.jardin-banner-nombre {
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.jardin-banner-meta {
+  font-size: 12px;
+  color: rgba(255,255,255,0.75);
+  margin-top: 3px;
+}
+.jardin-banner-meta a.jardin-breadcrumb {
+  color: rgba(255,255,255,0.85);
+  text-decoration: underline;
+}
+.jardin-banner-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.jardin-btn-volver {
+  display: inline-block;
+  padding: 6px 14px;
+  background: rgba(255,255,255,0.15);
+  color: #fff !important;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.jardin-btn-volver:hover {
+  background: rgba(255,255,255,0.25);
+  text-decoration: none;
+}
+
+/* Estado badge dentro del banner */
+.jardin-banner-estado {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.jardin-banner-estado.estado-trial     { background: #3b82f6; color: #fff; }
+.jardin-banner-estado.estado-activa    { background: #10b981; color: #fff; }
+.jardin-banner-estado.estado-morosa    { background: #f59e0b; color: #fff; }
+.jardin-banner-estado.estado-bloqueada { background: #ef4444; color: #fff; }
+.jardin-banner-estado.estado-cancelada { background: #6b7280; color: #fff; }
+
+/* Navegación rápida entre módulos (vista de módulo) */
+.jardin-nav-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.85) !important;
+  border-radius: 20px;
+  font-size: 11px;
+  text-decoration: none;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.jardin-nav-pill:hover,
+.jardin-nav-pill.active {
+  background: rgba(255,255,255,0.28);
+  color: #fff !important;
+  text-decoration: none;
+}
+.jardin-nav-pill.active {
+  font-weight: 700;
+}
+
+/* ── KPI Cards del jardín ────────────────────────────────────────────── */
+.jardin-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.jardin-kpi {
+  background: #fff;
+  border: 1px solid var(--corem-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.jardin-kpi-alert {
+  border-left: 4px solid #ef4444;
+}
+.jardin-kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.jardin-kpi-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* ── Secciones ───────────────────────────────────────────────────────── */
+.jardin-section {
+  background: #fff;
+  border: 1px solid var(--corem-border);
+  border-radius: 10px;
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+.jardin-section-header {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--corem-border);
+  background: #f8fafc;
+}
+.jardin-section-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+.jardin-section-header.jardin-section-danger {
+  background: #fef2f2;
+  border-bottom-color: #fecaca;
+}
+.jardin-section-header.jardin-section-danger h2 {
+  color: #991b1b;
+}
+.jardin-section-footer {
+  padding: 10px 18px;
+  border-top: 1px solid var(--corem-border);
+  background: #f8fafc;
+  font-size: 13px;
+}
+.jardin-section-footer a {
+  color: var(--corem-primary);
+  font-weight: 600;
+}
+
+/* ── Chips de estado de pensiones ───────────────────────────────────── */
+.jardin-pension-chips {
+  display: flex;
+  gap: 12px;
+  padding: 16px 18px;
+  flex-wrap: wrap;
+}
+.pension-chip {
+  flex: 1;
+  min-width: 100px;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: center;
+}
+.chip-pagado   { background: #dcfce7; }
+.chip-pendiente { background: #fef9c3; }
+.chip-vencido   { background: #fee2e2; }
+.chip-num {
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+.chip-lbl {
+  font-size: 11px;
+  color: #475569;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.chip-pagado   .chip-num { color: #166534; }
+.chip-pendiente .chip-num { color: #713f12; }
+.chip-vencido   .chip-num { color: #991b1b; }
+
+/* ── Grid de módulos ─────────────────────────────────────────────────── */
+.jardin-modulos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+.jardin-modulo-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 14px;
+  border: 2px solid var(--card-color, var(--corem-border));
+  border-radius: 10px;
+  text-decoration: none;
+  transition: all 0.15s;
+  background: #fff;
+  color: var(--corem-text);
+}
+.jardin-modulo-card:hover {
+  background: var(--card-color, var(--corem-primary));
+  color: #fff !important;
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+}
+.jardin-modulo-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+.jardin-modulo-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+.jardin-modulo-desc {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+}
+.jardin-modulo-card:hover .jardin-modulo-desc {
+  color: rgba(255,255,255,0.8);
+}
+
+/* ── Tablas del jardín ───────────────────────────────────────────────── */
+.jardin-table-wrap {
+  overflow-x: auto;
+}
+.jardin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.jardin-table-full {
+  min-width: 600px;
+}
+.jardin-table th {
+  text-align: left;
+  padding: 10px 14px;
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #475569;
+  border-bottom: 2px solid var(--corem-border);
+  white-space: nowrap;
+}
+.jardin-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.jardin-table tbody tr:hover {
+  background: #f0fdfa;
+}
+.jardin-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.badge-vencido {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+/* ── Toolbar de búsqueda (vista módulo) ──────────────────────────────── */
+.jardin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.jardin-search-form {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.jardin-search-input {
+  padding: 8px 12px;
+  border: 1px solid var(--corem-border);
+  border-radius: 6px;
+  font-size: 13px;
+  width: 260px;
+  max-width: 100%;
+}
+.jardin-search-input:focus {
+  border-color: var(--corem-primary);
+  outline: 2px solid rgba(13,148,136,0.15);
+}
+.jardin-search-btn {
+  padding: 8px 16px;
+  background: var(--corem-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.jardin-search-clear {
+  font-size: 12px;
+  color: #64748b;
+  text-decoration: none;
+  padding: 4px 8px;
+}
+.jardin-total {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* ── Paginación (vista módulo) ───────────────────────────────────────── */
+.jardin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px;
+  border-top: 1px solid var(--corem-border);
+}
+.jardin-page-btn {
+  padding: 6px 14px;
+  background: var(--corem-primary);
+  color: #fff !important;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.jardin-page-btn:hover {
+  background: var(--corem-primary-dark);
+  text-decoration: none;
+}
+.jardin-page-info {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* ── Estado vacío ────────────────────────────────────────────────────── */
+.jardin-empty {
+  padding: 36px;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+/* ── Info row: Acceso al jardín y Suscripción ───────────────────────── */
+.jardin-info-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.jardin-info-card {
+  background: #fff;
+  border: 1px solid var(--corem-border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.jardin-info-header {
+  background: #f8fafc;
+  border-bottom: 1px solid var(--corem-border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.jardin-info-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  color: #0f172a;
+}
+.jardin-info-body {
+  padding: 14px 16px;
+}
+.jardin-info-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px dashed #f1f5f9;
+}
+.jardin-info-line:last-child { border-bottom: none; }
+.jardin-info-label {
+  color: #64748b;
+  font-weight: 500;
+}
+.jardin-info-value {
+  color: #0f172a;
+  font-weight: 600;
+}
+.jardin-info-value a { color: var(--corem-primary); }
+.jardin-info-empty {
+  color: #94a3b8;
+  font-style: italic;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.jardin-info-empty a {
+  color: var(--corem-primary);
+  font-weight: 600;
+  font-style: normal;
+  margin-left: 6px;
+}
+.jardin-info-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--corem-border);
+  flex-wrap: wrap;
+}
+
+/* Admin row dentro de "Acceso al jardín" */
+.jardin-admin-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid #f1f5f9;
+  flex-wrap: wrap;
+}
+.jardin-admin-row:first-of-type { border-top: 1px solid var(--corem-border); margin-top: 8px; }
+.jardin-admin-info { flex: 1; min-width: 180px; }
+.jardin-admin-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: #0f172a;
+}
+.badge-super {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: #fef3c7;
+  color: #92400e;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.jardin-admin-email {
+  font-size: 12px;
+  color: var(--corem-primary);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  margin-top: 2px;
+}
+.jardin-admin-meta {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 3px;
+}
+.jardin-admin-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+.jardin-mini-check {
+  font-size: 11px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.jardin-mini-check input { margin: 0; }
+
+/* Botones */
+.jardin-btn-warning {
+  padding: 6px 14px;
+  background: #f59e0b;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.jardin-btn-warning:hover { background: #d97706; }
+
+.jardin-btn-secondary {
+  display: inline-block;
+  padding: 6px 12px;
+  background: #f1f5f9;
+  color: #334155 !important;
+  border: 1px solid var(--corem-border);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.jardin-btn-secondary:hover {
+  background: #e2e8f0;
+  text-decoration: none;
+}
+
+/* ── Vista de password generada ─────────────────────────────────────── */
+.password-reveal-card {
+  background: #fff;
+  border: 1px solid var(--corem-border);
+  border-radius: 10px;
+  padding: 24px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+.password-warning {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  margin-bottom: 18px;
+}
+.password-grid { margin-bottom: 18px; }
+.password-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+.password-label {
+  color: #64748b;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-weight: 600;
+}
+.password-value {
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 14px;
+}
+.password-value-mono {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.password-value-mono code {
+  background: #1e293b;
+  color: #fef9c3;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.password-copy-btn {
+  padding: 8px 14px;
+  background: var(--corem-primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.password-copy-btn:hover { background: var(--corem-primary-dark); }
+.password-info {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+.password-info-success { background: #dcfce7; color: #166534; }
+.password-info-warning { background: #fef9c3; color: #713f12; }
+.password-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   DRAWER LATERAL (menú hamburguesa)
+   En desktop (≥1025px): persistente, empuja el contenido, plegable.
+   En mobile (≤1024px): overlay con backdrop.
+   ══════════════════════════════════════════════════════════════════════ */
+
+.corem-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 9000;
+}
+.corem-drawer-overlay.open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.corem-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 260px;
+  max-width: 85vw;
+  background: #ffffff;
+  border-right: 1px solid var(--corem-border);
+  box-shadow: 4px 0 24px rgba(15, 23, 42, 0.18);
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 9100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.corem-drawer.open {
+  transform: translateX(0);
+}
+
+/* ── Modo desktop: drawer persistente que empuja el contenido ───────── */
+@media (min-width: 1025px) {
+  /* Sin overlay ni shadow grande en desktop */
+  .corem-drawer-overlay { display: none !important; }
+  .corem-drawer {
+    box-shadow: none;
+  }
+  /* Push del contenido cuando el drawer está abierto */
+  body:not(.drawer-collapsed) #header,
+  body:not(.drawer-collapsed) div.breadcrumbs,
+  body:not(.drawer-collapsed) #main,
+  body:not(.drawer-collapsed) #footer {
+    margin-left: 260px;
+    transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  body.drawer-collapsed .corem-drawer {
+    transform: translateX(-100%);
+  }
+  body.drawer-collapsed #header,
+  body.drawer-collapsed div.breadcrumbs,
+  body.drawer-collapsed #main,
+  body.drawer-collapsed #footer {
+    margin-left: 0;
+    transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  /* Cuando está plegado, el botón ✕ del head debe verse como hamburguesa de re-apertura */
+  body.drawer-collapsed .corem-drawer-close::before { content: ""; }
+}
+
+.corem-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, var(--corem-primary-dark) 0%, var(--corem-primary) 100%);
+  color: #fff;
+  padding: 14px 18px;
+  height: 56px;
+  flex-shrink: 0;
+}
+.corem-drawer-logo {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+.corem-drawer-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.corem-drawer-close:hover { background: rgba(255, 255, 255, 0.18); }
+
+.corem-drawer-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 0 28px;
+}
+.corem-drawer-section {
+  margin-bottom: 8px;
+}
+.corem-drawer-section:not(:last-child) {
+  border-bottom: 1px solid #f1f5f9;
+  padding-bottom: 8px;
+  margin-bottom: 8px;
+}
+.corem-drawer-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 10px 18px 6px;
+}
+.corem-drawer-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 18px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #1e293b !important;
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+  border-left: 3px solid transparent;
+}
+.corem-drawer-item:hover {
+  background: var(--corem-accent);
+  color: var(--corem-primary-dark) !important;
+  text-decoration: none;
+  border-left-color: var(--corem-primary);
+}
+.corem-drawer-icon {
+  width: 22px;
+  font-size: 16px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.corem-drawer-item-action {
+  color: var(--corem-primary) !important;
+  font-weight: 700;
+}
+.corem-drawer-item-logout {
+  color: #ef4444 !important;
+}
+.corem-drawer-item-logout:hover {
+  background: #fef2f2;
+  color: #b91c1c !important;
+  border-left-color: #ef4444;
+}
+
+body.corem-drawer-locked { overflow: hidden; }
+
+/* ── Tablet horizontal (iPad Air 11" landscape ≈ 1180px) ────────────── */
+@media (max-width: 1280px) {
+  /* Filtros aún a la derecha pero más estrechos */
+  #changelist-filter { width: 190px; }
+  /* Banner del jardín se compacta */
+  .jardin-banner-right { gap: 4px; }
+  .jardin-nav-pill { font-size: 10.5px; padding: 3px 8px; }
+}
+
+/* ── Tablet vertical / mobile (iPad portrait 820px y menor) ──────────── */
+@media (max-width: 1024px) {
+  #content { padding: 16px; }
+  #header { padding: 0 16px; }
+  /* Filtros se van arriba (apilados) en lugar de columna lateral */
+  #changelist { flex-direction: column; }
+  #changelist-filter {
+    width: 100%;
+    position: static;
+    max-height: none;
+  }
+  #changelist-filter ul { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 14px; }
+  #changelist-filter li { padding: 0; }
+  #changelist-filter li a {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #f1f5f9;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+  /* Tablas con scroll horizontal solo cuando es estrictamente necesario */
+  #changelist .results { overflow-x: auto; }
+
+  .jardin-banner { flex-direction: column; }
+  .jardin-banner-right { width: 100%; justify-content: flex-start; }
+  .jardin-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .jardin-modulos-grid { grid-template-columns: repeat(2, 1fr); }
+  .jardin-search-input { width: 100%; }
+  .jardin-info-row { grid-template-columns: 1fr; }
+  .jardin-admin-row { flex-direction: column; }
+  .jardin-admin-actions { align-items: flex-start; width: 100%; }
+}
+
+/* ── Mobile pequeño ──────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .jardin-kpi-grid { grid-template-columns: 1fr; }
+  .jardin-modulos-grid { grid-template-columns: 1fr; }
+  .corem-drawer { width: 88vw; }
+}

@@ -8,7 +8,7 @@ class Classroom(models.Model):
         CUATRO = 4, "4 años"
         CINCO = 5, "5 años"
 
-    nombre = models.CharField(max_length=100, verbose_name="Nombre")
+    nombre = models.CharField(max_length=100, verbose_name="Nombre", unique=True)
     nivel_edad = models.IntegerField(
         choices=NivelEdad.choices, verbose_name="Nivel de edad"
     )
@@ -29,19 +29,16 @@ class Classroom(models.Model):
         related_name="aulas_auxiliar",
         verbose_name="Profesor auxiliar",
     )
-    anio_escolar = models.IntegerField(verbose_name="Año escolar")
-    activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ("nombre", "anio_escolar")
-        ordering = ["anio_escolar", "nivel_edad", "nombre"]
+        ordering = ["nivel_edad", "nombre"]
         verbose_name = "Aula"
         verbose_name_plural = "Aulas"
 
     def __str__(self):
-        return f"{self.nombre} ({self.nivel_edad} años) - {self.anio_escolar}"
+        return f"{self.nombre} ({self.nivel_edad} años)"
 
     @property
     def alumnos_count(self):

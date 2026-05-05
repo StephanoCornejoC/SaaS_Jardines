@@ -1,0 +1,116 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ modulo_meta.title }} — {{ tenant.nombre }} | COREM Admin{% endblock %}
+
+{% block content_title %}{% endblock %}
+
+{% block content %}
+
+{# ── Banner del jardín ──────────────────────────────────────────────────── #}
+<div class="jardin-banner">
+  <div class="jardin-banner-left">
+    <span class="jardin-banner-icon">{{ modulo_meta.icon }}</span>
+    <div>
+      <div class="jardin-banner-nombre">{{ tenant.nombre }}</div>
+      <div class="jardin-banner-meta">
+        <a href="{% url 'admin:jardin_dashboard' schema %}" class="jardin-breadcrumb">Dashboard del jardín</a>
+        › {{ modulo_meta.title }}
+      </div>
+    </div>
+  </div>
+  <div class="jardin-banner-right">
+    {# Navegación rápida entre módulos #}
+    {% for m in modulos %}
+      <a href="{% url 'admin:jardin_modulo' schema m.key %}"
+         class="jardin-nav-pill {% if m.key == modulo %}active{% endif %}">
+        {{ m.icon }} {{ m.title }}
+      </a>
+    {% endfor %}
+    <a href="{% url 'admin:tenants_tenant_changelist' %}" class="jardin-btn-volver">
+      ← Panel COREM
+    </a>
+  </div>
+</div>
+
+{# ── Barra de búsqueda y totales ─────────────────────────────────────────── #}
+<div class="jardin-toolbar">
+  <form method="get" class="jardin-search-form">
+    <input type="text" name="q" value="{{ search }}"
+           placeholder="Buscar en {{ modulo_meta.title|lower }}..."
+           class="jardin-search-input">
+    <button type="submit" class="jardin-search-btn">Buscar</button>
+    {% if search %}
+      <a href="{% url 'admin:jardin_modulo' schema modulo %}" class="jardin-search-clear">✕ Limpiar</a>
+    {% endif %}
+  </form>
+  <div class="jardin-total">
+    {{ total }} registro{{ total|pluralize }}
+    {% if search %} — filtrado por "{{ search }}"{% endif %}
+  </div>
+</div>
+
+{# ── Tabla de datos ───────────────────────────────────────────────────────── #}
+<div class="jardin-section">
+  {% if rows %}
+  <div class="jardin-table-wrap">
+    <table class="jardin-table jardin-table-full">
+      <thead>
+        <tr>
+          {% for col in columns %}
+            <th>{{ col }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          {% for cell in row %}
+          <td>
+            {% if cell.is_badge %}
+              <span class="jardin-badge"
+                    style="background:{{ cell.bg }};color:{{ cell.fg }}">
+                {{ cell.valor }}
+              </span>
+            {% else %}
+              {{ cell }}
+            {% endif %}
+          </td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# ── Paginación ───────────────────────────────────────────────────────── #}
+  {% if page_obj.has_other_pages %}
+  <div class="jardin-pagination">
+    {% if page_obj.has_previous %}
+      <a href="?page={{ page_obj.previous_page_number }}{% if search %}&q={{ search }}{% endif %}"
+         class="jardin-page-btn">‹ Anterior</a>
+    {% endif %}
+    <span class="jardin-page-info">
+      Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}
+    </span>
+    {% if page_obj.has_next %}
+      <a href="?page={{ page_obj.next_page_number }}{% if search %}&q={{ search }}{% endif %}"
+         class="jardin-page-btn">Siguiente ›</a>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% else %}
+  <div class="jardin-empty">
+    <p>
+      {% if search %}
+        No se encontraron resultados para "<strong>{{ search }}</strong>".
+      {% else %}
+        No hay registros en este módulo.
+      {% endif %}
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

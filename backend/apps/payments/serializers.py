@@ -38,6 +38,7 @@ class PaymentListSerializer(serializers.ModelSerializer):
             "monto",
             "estado",
             "fecha_vencimiento",
+            "fecha_pago",
             "is_overdue",
         )
 
@@ -61,3 +62,10 @@ class PaymentRegisterSerializer(serializers.Serializer):
     )
     comprobante = serializers.CharField(required=False, allow_blank=True)
     observaciones = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        if data.get("estado") == Payment.Estado.PAGADO and not data.get("metodo_pago"):
+            raise serializers.ValidationError(
+                {"metodo_pago": "El método de pago es obligatorio cuando el estado es PAGADO."}
+            )
+        return data

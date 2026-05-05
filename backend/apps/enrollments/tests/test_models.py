@@ -15,7 +15,6 @@ class TestEnrollmentModel:
     def test_creation(self, tenant):
         enrollment = EnrollmentFactory()
         assert enrollment.pk is not None
-        assert enrollment.estado == "PENDIENTE"
 
     def test_unique_together(self, tenant):
         student = StudentFactory()
@@ -28,4 +27,3 @@ class TestEnrollmentModel:
         enrollment = EnrollmentFactory()
         result = str(enrollment)
         assert str(enrollment.anio_escolar) in result
-        assert "Pendiente" in result

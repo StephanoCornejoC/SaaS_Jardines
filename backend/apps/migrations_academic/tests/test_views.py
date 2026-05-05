@@ -12,7 +12,7 @@ pytestmark = [pytest.mark.django_db, pytest.mark.unit]
 class TestAcademicMigrationViewSet:
     def test_preview_as_admin(self, auth_client, admin_user):
         current_year = date.today().year
-        aula = ClassroomFactory(nivel_edad=3, anio_escolar=current_year)
+        aula = ClassroomFactory(nivel_edad=3)
         StudentFactory(classroom=aula, estado="ACTIVO")
 
         client = auth_client(admin_user)

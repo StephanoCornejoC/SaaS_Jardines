@@ -3,8 +3,6 @@ from rest_framework import filters, viewsets
 from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 
-from apps.users.permissions import IsAdminJardinOrAbove
-
 from .models import Guardian, MedicalRecord, Student
 from .serializers import (
     GuardianSerializer,
@@ -25,11 +23,6 @@ class StudentViewSet(viewsets.ModelViewSet):
     ordering_fields = ["apellidos", "nombres", "fecha_ingreso"]
     ordering = ["apellidos"]
 
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAdminJardinOrAbove()]
-        return [IsAuthenticated()]
-
     def get_serializer_class(self):
         if self.action == "list":
             return StudentListSerializer
@@ -39,11 +32,6 @@ class StudentViewSet(viewsets.ModelViewSet):
 class GuardianViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = GuardianSerializer
-
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [IsAdminJardinOrAbove()]
-        return [IsAuthenticated()]
 
     def get_queryset(self):
         student_pk = self.kwargs.get("student_pk")
@@ -60,11 +48,6 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     serializer_class = MedicalRecordSerializer
     http_method_names = ["get", "post", "put", "patch"]
-
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update']:
-            return [IsAdminJardinOrAbove()]
-        return [IsAuthenticated()]
 
     def get_queryset(self):
         student_pk = self.kwargs.get("student_pk")

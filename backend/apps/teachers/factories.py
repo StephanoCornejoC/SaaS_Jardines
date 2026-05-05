@@ -16,7 +16,6 @@ class TeacherFactory(factory.django.DjangoModelFactory):
     telefono = factory.Sequence(lambda n: f"9{70000000 + n}")
     email = factory.LazyAttribute(lambda o: f"{o.nombres.lower()}.teacher@test.com")
     fecha_ingreso = factory.LazyFunction(date.today)
-    activo = True
 
 
 class TeacherContractFactory(factory.django.DjangoModelFactory):

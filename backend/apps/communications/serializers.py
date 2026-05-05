@@ -7,6 +7,9 @@ class CommunicationSerializer(serializers.ModelSerializer):
     classroom_nombre = serializers.StringRelatedField(
         source="classroom", read_only=True
     )
+    enviado_por_nombre = serializers.StringRelatedField(
+        source="enviado_por", read_only=True
+    )
 
     class Meta:
         model = Communication
@@ -18,12 +21,21 @@ class CommunicationSerializer(serializers.ModelSerializer):
             "classroom",
             "classroom_nombre",
             "enviado_por",
+            "enviado_por_nombre",
             "fecha_envio",
             "enviado",
             "created_at",
             "updated_at",
         )
-        read_only_fields = ("id", "enviado_por", "fecha_envio", "enviado", "created_at", "updated_at")
+        read_only_fields = (
+            "id",
+            "enviado_por",
+            "enviado_por_nombre",
+            "fecha_envio",
+            "enviado",
+            "created_at",
+            "updated_at",
+        )
 
     def create(self, validated_data):
         request = self.context.get("request")

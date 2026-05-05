@@ -1,0 +1,164 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | {{ site_title|default:"COREM Admin" }}{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <link rel="stylesheet" href="{% static 'admin/css/corem.css' %}">
+{% endblock %}
+
+{% block branding %}
+  <div class="corem-branding-row">
+    <button type="button" class="corem-hamburger" id="corem-hamburger-btn"
+            aria-label="Abrir menú" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+    <h1 id="site-name">
+      <a href="{% url 'admin:index' %}">{{ site_header|default:"COREM SaaS" }}</a>
+    </h1>
+  </div>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
+
+{# Drawer lateral con la navegación principal — se monta en TODAS las páginas del admin #}
+{% block footer %}
+  {{ block.super }}
+
+  <div class="corem-drawer-overlay" id="corem-drawer-overlay"></div>
+  <aside class="corem-drawer" id="corem-drawer" aria-hidden="true">
+    <div class="corem-drawer-head">
+      <span class="corem-drawer-logo">COREM SaaS</span>
+      <button type="button" class="corem-drawer-close" id="corem-drawer-close"
+              aria-label="Cerrar menú">×</button>
+    </div>
+
+    <nav class="corem-drawer-nav">
+      <div class="corem-drawer-section">
+        <div class="corem-drawer-label">Panel</div>
+        <a href="{% url 'admin:index' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">📊</span> Dashboard
+        </a>
+      </div>
+
+      <div class="corem-drawer-section">
+        <div class="corem-drawer-label">Jardines</div>
+        <a href="{% url 'admin:tenants_tenant_changelist' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">🏫</span> Lista de jardines
+        </a>
+        <a href="{% url 'admin:tenants_tenant_crear_jardin' %}" class="corem-drawer-item corem-drawer-item-action">
+          <span class="corem-drawer-icon">＋</span> Crear nuevo jardín
+        </a>
+        <a href="{% url 'admin:tenants_domain_changelist' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">🌐</span> Dominios
+        </a>
+      </div>
+
+      <div class="corem-drawer-section">
+        <div class="corem-drawer-label">Suscripciones y cobros</div>
+        <a href="{% url 'admin:platform_tenantsubscription_changelist' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">📑</span> Suscripciones
+        </a>
+        <a href="{% url 'admin:platform_platforminvoice_changelist' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">💵</span> Cobros mensuales
+        </a>
+        <a href="{% url 'admin:platform_platformcost_changelist' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">🧾</span> Gastos operativos
+        </a>
+        <a href="{% url 'admin:platform_plan_changelist' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">🏷</span> Planes
+        </a>
+      </div>
+
+      <div class="corem-drawer-section">
+        <div class="corem-drawer-label">Usuarios COREM</div>
+        <a href="{% url 'admin:users_user_changelist' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">👤</span> Usuarios
+        </a>
+        <a href="{% url 'admin:auth_group_changelist' %}" class="corem-drawer-item">
+          <span class="corem-drawer-icon">🛡</span> Grupos
+        </a>
+      </div>
+
+      <div class="corem-drawer-section">
+        <a href="{% url 'admin:logout' %}" class="corem-drawer-item corem-drawer-item-logout">
+          <span class="corem-drawer-icon">⏻</span> Cerrar sesión
+        </a>
+      </div>
+    </nav>
+  </aside>
+
+  <script>
+    (function() {
+      const btn = document.getElementById('corem-hamburger-btn');
+      const drawer = document.getElementById('corem-drawer');
+      const overlay = document.getElementById('corem-drawer-overlay');
+      const closeBtn = document.getElementById('corem-drawer-close');
+      const body = document.body;
+      const KEY = 'corem-drawer-collapsed';
+      const MQ_DESKTOP = window.matchMedia('(min-width: 1025px)');
+
+      function isDesktop() { return MQ_DESKTOP.matches; }
+
+      // Estado inicial: en desktop, abierto por defecto (a menos que el user lo haya plegado)
+      function applyInitial() {
+        if (isDesktop()) {
+          const wasCollapsed = localStorage.getItem(KEY) === '1';
+          if (wasCollapsed) {
+            body.classList.add('drawer-collapsed');
+          } else {
+            body.classList.remove('drawer-collapsed');
+          }
+          // En desktop el drawer siempre está "open" (es persistente)
+          drawer.classList.add('open');
+          overlay.classList.remove('open');
+          body.classList.remove('corem-drawer-locked');
+        } else {
+          // Mobile: drawer cerrado por defecto
+          drawer.classList.remove('open');
+          overlay.classList.remove('open');
+          body.classList.remove('corem-drawer-locked');
+        }
+      }
+
+      function toggleDesktop() {
+        const collapsed = body.classList.toggle('drawer-collapsed');
+        localStorage.setItem(KEY, collapsed ? '1' : '0');
+        btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      }
+
+      function openMobile() {
+        drawer.classList.add('open');
+        overlay.classList.add('open');
+        body.classList.add('corem-drawer-locked');
+        btn.setAttribute('aria-expanded', 'true');
+        drawer.setAttribute('aria-hidden', 'false');
+      }
+      function closeMobile() {
+        drawer.classList.remove('open');
+        overlay.classList.remove('open');
+        body.classList.remove('corem-drawer-locked');
+        btn.setAttribute('aria-expanded', 'false');
+        drawer.setAttribute('aria-hidden', 'true');
+      }
+
+      btn && btn.addEventListener('click', () => {
+        if (isDesktop()) {
+          toggleDesktop();
+        } else {
+          drawer.classList.contains('open') ? closeMobile() : openMobile();
+        }
+      });
+      closeBtn && closeBtn.addEventListener('click', () => {
+        if (isDesktop()) toggleDesktop(); else closeMobile();
+      });
+      overlay && overlay.addEventListener('click', closeMobile);
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && !isDesktop() && drawer.classList.contains('open')) closeMobile();
+      });
+      MQ_DESKTOP.addEventListener('change', applyInitial);
+      applyInitial();
+    })();
+  </script>
+{% endblock %}

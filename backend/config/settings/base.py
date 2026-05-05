@@ -28,9 +28,8 @@ SHARED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # Admin
-    "jazzmin",
-    "django.contrib.admin",
+    # Admin nativo con CoremAdminSite (filtra modelos por schema y los reagrupa)
+    "config.apps.CoremAdminConfig",
     # Third party (shared)
     "rest_framework",
     "rest_framework_simplejwt",
@@ -43,6 +42,8 @@ SHARED_APPS = [
     "django_otp.plugins.otp_totp",
     # Users must be shared for public schema auth
     "apps.users",
+    # Plataforma SaaS (modelos en schema público: planes, suscripciones, cobros, gastos)
+    "apps.platform",
 ]
 
 TENANT_APPS = [
@@ -91,6 +92,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "auditlog.middleware.AuditlogMiddleware",
     "axes.middleware.AxesMiddleware",
+    "apps.platform.middleware.BlockSuspendedTenantMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -174,7 +176,29 @@ AXES_LOCKOUT_CALLABLE = None
 AXES_RESET_ON_SUCCESS = True
 
 # --- Audit Log ---
-AUDITLOG_INCLUDE_ALL_MODELS = True
+# Solo modelos sensibles. Auditar todos genera muchas escrituras y agranda
+# la tabla de logs (cada UPDATE = 1 registro).
+AUDITLOG_INCLUDE_ALL_MODELS = False
+AUDITLOG_INCLUDE_TRACKING_MODELS = (
+    "students.Student",
+    "students.Guardian",
+    "enrollments.Enrollment",
+    "payments.Payment",
+    "payments.MonthlyFee",
+    "cashflow.CashTransaction",
+    "cashflow.MonthlyClosure",
+    # No incluir users.User aquí: causa joins con tablas tenant al
+    # operar en schema público (auditlog explora relaciones inversas).
+)
+
+# --- Cache (memoria local en dev, configurar Redis en prod) ---
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "corem-default",
+        "TIMEOUT": 300,
+    }
+}
 
 # --- i18n ---
 LANGUAGE_CODE = "es"
@@ -185,7 +209,11 @@ USE_TZ = True
 # --- Static & Media ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
@@ -204,41 +232,113 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@corem.pe")
 
-# --- Django Jazzmin Admin ---
-JAZZMIN_SETTINGS = {
+# --- Branding admin nativo (sustituye los settings de jazzmin) ---
+# Usamos admin.site.site_title/site_header en config/urls.py, ver tienda.
+# Aquí dejamos JAZZMIN_SETTINGS solo como referencia inactiva.
+_JAZZMIN_SETTINGS_LEGACY = {
     "site_title": "COREM Admin",
-    "site_header": "COREM - Gestion de Jardines",
-    "site_brand": "COREM SaaS",
-    "welcome_sign": "Panel de Administracion COREM",
+    "site_header": "COREM SaaS",
+    "site_brand": "COREM",
+    "site_logo": None,
+    "site_logo_classes": "img-circle",
+    "welcome_sign": "Panel de administración del jardín",
     "copyright": "COREM Labs S.A.C.",
+    "search_model": ["students.Student", "teachers.Teacher", "users.User"],
     "show_sidebar": True,
-    "navigation_expanded": False,
+    "navigation_expanded": True,
+    "show_ui_builder": False,
     "icons": {
+        # Plataforma SaaS
+        "platform.Plan":               "fas fa-tag",
+        "platform.TenantSubscription": "fas fa-handshake",
+        "platform.PlatformInvoice":    "fas fa-file-invoice-dollar",
+        "platform.PlatformCost":       "fas fa-receipt",
+        # Tenants y usuarios
         "tenants.Tenant": "fas fa-school",
         "tenants.Domain": "fas fa-globe",
-        "users.User": "fas fa-users-cog",
+        "users.User": "fas fa-user-shield",
+        # Gestión escolar
         "students.Student": "fas fa-child",
         "students.Guardian": "fas fa-user-friends",
         "students.MedicalRecord": "fas fa-notes-medical",
         "teachers.Teacher": "fas fa-chalkboard-teacher",
         "teachers.TeacherContract": "fas fa-file-contract",
-        "teachers.TeacherPayment": "fas fa-money-check",
+        "teachers.TeacherPayment": "fas fa-money-check-alt",
         "classrooms.Classroom": "fas fa-door-open",
+        "attendance.Attendance": "fas fa-calendar-check",
+        # Finanzas
         "enrollments.Enrollment": "fas fa-clipboard-list",
         "payments.MonthlyFee": "fas fa-file-invoice-dollar",
         "payments.Payment": "fas fa-credit-card",
         "cashflow.CashCategory": "fas fa-tags",
         "cashflow.CashTransaction": "fas fa-exchange-alt",
         "cashflow.MonthlyClosure": "fas fa-lock",
-        "attendance.Attendance": "fas fa-calendar-check",
+        # Operaciones
         "communications.Communication": "fas fa-envelope",
         "notifications.EmailLog": "fas fa-paper-plane",
         "dashboard.DashboardMetric": "fas fa-chart-line",
         "migrations_academic.AcademicMigration": "fas fa-graduation-cap",
     },
+    "default_icon_parents": "fas fa-folder",
+    "default_icon_children": "fas fa-circle",
     "order_with_respect_to": [
-        "tenants", "users", "students", "teachers", "classrooms",
-        "enrollments", "payments", "cashflow", "attendance",
-        "communications", "notifications", "dashboard", "migrations_academic",
+        "platform",
+        "tenants",
+        "users",
+        "students",
+        "teachers",
+        "classrooms",
+        "attendance",
+        "enrollments",
+        "payments",
+        "cashflow",
+        "communications",
+        "notifications",
+        "dashboard",
+        "migrations_academic",
     ],
+    "custom_links": {},
+    "topmenu_links": [
+        {"name": "Dashboard COREM", "url": "/admin/dashboard/", "permissions": ["auth.view_user"]},
+        {"name": "Crear jardín",    "url": "admin:tenants_tenant_crear_jardin", "permissions": ["auth.view_user"]},
+        {"name": "Volver al SaaS",  "url": "/", "new_window": True},
+    ],
+    "usermenu_links": [
+        {"name": "Volver al SaaS", "url": "/", "new_window": True},
+    ],
+    "language_chooser": False,
+    "changeform_format": "horizontal_tabs",
+}
+
+_JAZZMIN_UI_TWEAKS_LEGACY = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-teal",
+    "accent": "accent-teal",
+    "navbar": "navbar-teal navbar-dark",
+    "no_navbar_border": True,
+    "navbar_fixed": True,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-dark-teal",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_compact_style": False,
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": False,
+    "theme": "flatly",
+    "dark_mode_theme": "darkly",
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success",
+    },
+    "actions_sticky_top": True,
 }

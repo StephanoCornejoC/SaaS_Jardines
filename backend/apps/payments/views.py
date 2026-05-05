@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import date
 from decimal import Decimal
 
@@ -5,11 +6,12 @@ from django.db.models import Sum
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.cashflow.models import CashCategory, CashTransaction
-from apps.users.permissions import IsAdminJardinOrAbove
+from apps.students.models import Student
 from shared.validators import validate_month_param, validate_year_param
 
 from .models import MonthlyFee, Payment
@@ -20,6 +22,40 @@ from .serializers import (
     PaymentRegisterSerializer,
 )
 from .services import generate_yape_qr
+
+
+MES_INICIO_ESCOLAR = 3   # Marzo
+MES_FIN_ESCOLAR = 12     # Diciembre
+
+
+def _ensure_yearly_payments(student, monthly_fee, anio):
+    """
+    Crea los Payment (PENDIENTE) de marzo a diciembre del año si no existen.
+    Enero y febrero son vacaciones — no se cobra pensión.
+    """
+    existentes = {
+        p.mes: p
+        for p in Payment.objects.filter(student=student, anio=anio)
+    }
+    creados = []
+    for mes in range(MES_INICIO_ESCOLAR, MES_FIN_ESCOLAR + 1):
+        if mes in existentes:
+            continue
+        ultimo_dia = monthrange(anio, mes)[1]
+        dia_venc = min(monthly_fee.dia_vencimiento, ultimo_dia)
+        creados.append(
+            Payment(
+                student=student,
+                monthly_fee=monthly_fee,
+                mes=mes,
+                anio=anio,
+                monto=monthly_fee.monto_mensual,
+                estado=Payment.Estado.PENDIENTE,
+                fecha_vencimiento=date(anio, mes, dia_venc),
+            )
+        )
+    if creados:
+        Payment.objects.bulk_create(creados)
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
@@ -38,7 +74,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
             return PaymentRegisterSerializer
         return PaymentDetailSerializer
 
-    @action(detail=True, methods=["patch"], url_path="registrar-pago", permission_classes=[IsAdminJardinOrAbove])
+    @action(detail=True, methods=["patch"], url_path="registrar-pago")
     def registrar_pago(self, request, pk=None):
         """Registrar el pago de una pension."""
         payment = self.get_object()
@@ -87,9 +123,70 @@ class PaymentViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "no-cache"
         return response
 
+    @action(detail=False, methods=["get"], url_path="por-alumno")
+    def por_alumno(self, request):
+        """
+        Devuelve las 12 pensiones del año para un alumno. Si faltan meses,
+        los crea como PENDIENTE usando la MonthlyFee del año.
+        Query params: student (id), anio (default current year)
+        """
+        student_id = request.query_params.get("student")
+        if not student_id:
+            return Response(
+                {"error": "Parámetro 'student' es obligatorio."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        anio = validate_year_param(request.query_params.get("anio")) or date.today().year
+
+        student = get_object_or_404(Student, pk=student_id)
+        monthly_fee = MonthlyFee.objects.filter(student=student, anio_escolar=anio).first()
+        if not monthly_fee:
+            return Response(
+                {
+                    "error": (
+                        "Este alumno aún no tiene pensión configurada para el año "
+                        f"{anio}. Debe registrar su matrícula primero."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        _ensure_yearly_payments(student, monthly_fee, anio)
+
+        pagos = Payment.objects.filter(
+            student=student,
+            anio=anio,
+            mes__gte=MES_INICIO_ESCOLAR,
+            mes__lte=MES_FIN_ESCOLAR,
+        ).order_by("mes")
+        total_pagado = pagos.filter(estado=Payment.Estado.PAGADO).aggregate(
+            t=Sum("monto")
+        )["t"] or Decimal("0.00")
+        pendientes = pagos.exclude(
+            estado__in=[Payment.Estado.PAGADO, Payment.Estado.EXONERADO]
+        ).count()
+
+        serializer = PaymentDetailSerializer(pagos, many=True)
+        return Response(
+            {
+                "student": {
+                    "id": student.id,
+                    "dni": student.dni,
+                    "nombre": str(student),
+                    "classroom": student.classroom.nombre if student.classroom else None,
+                    "edad": student.edad,
+                },
+                "anio_escolar": anio,
+                "monto_mensual": str(monthly_fee.monto_mensual),
+                "total_pagado": str(total_pagado),
+                "pendientes": pendientes,
+                "pagos": serializer.data,
+            }
+        )
+
     @action(detail=False, methods=["get"], url_path="morosidad")
     def morosidad(self, request):
-        """Reporte de pagos vencidos (morosidad)."""
+        """Reporte de pagos vencidos (morosidad). Solo meses lectivos (mar-dic)."""
         anio = validate_year_param(request.query_params.get("anio")) or date.today().year
         mes = validate_month_param(request.query_params.get("mes"))
 
@@ -97,6 +194,8 @@ class PaymentViewSet(viewsets.ModelViewSet):
             anio=anio,
             estado__in=[Payment.Estado.PENDIENTE, Payment.Estado.VENCIDO],
             fecha_vencimiento__lt=date.today(),
+            mes__gte=MES_INICIO_ESCOLAR,
+            mes__lte=MES_FIN_ESCOLAR,
         )
 
         if mes:

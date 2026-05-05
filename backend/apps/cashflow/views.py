@@ -6,7 +6,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.users.permissions import IsAdminJardinOrAbove
 from shared.validators import validate_date_param, validate_month_param, validate_year_param
 
 from .models import CashCategory, CashTransaction, MonthlyClosure
@@ -73,7 +72,7 @@ class CashTransactionViewSet(viewsets.ModelViewSet):
         serializer = CashflowSummarySerializer(summary, many=True)
         return Response(serializer.data)
 
-    @action(detail=False, methods=["post"], url_path="cerrar-mes", permission_classes=[IsAdminJardinOrAbove])
+    @action(detail=False, methods=["post"], url_path="cerrar-mes")
     def cerrar_mes(self, request):
         """Cierra el mes contable generando un registro de cierre."""
         mes = request.data.get("mes")

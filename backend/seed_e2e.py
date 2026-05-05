@@ -102,7 +102,6 @@ with schema_context("garabato"):
             "email": "rosa.castro@garabato.com",
             "telefono": "987654321",
             "fecha_ingreso": date(2024, 3, 1),
-            "activo": True,
         },
     )
     t2, _ = Teacher.objects.update_or_create(
@@ -114,7 +113,6 @@ with schema_context("garabato"):
             "email": "luz.mendoza@garabato.com",
             "telefono": "987654322",
             "fecha_ingreso": date(2024, 3, 1),
-            "activo": True,
         },
     )
     print(f"  - {t1} - {t2}")
@@ -126,20 +124,16 @@ with schema_context("garabato"):
         aula_3 = Classroom.objects.create(
             nombre="Sala Azul",
             nivel_edad=3,
-            anio_escolar=2026,
             capacidad=15,
             profesor_titular=t1,
-            activo=True,
         )
     aula_4 = Classroom.objects.filter(nombre="Sala Rojitos").first()
     if not aula_4:
         aula_4 = Classroom.objects.create(
             nombre="Sala Rojitos",
             nivel_edad=4,
-            anio_escolar=2026,
             capacidad=15,
             profesor_titular=t2,
-            activo=True,
         )
     print(f"  - {aula_3} (cap {aula_3.capacidad})")
     print(f"  - {aula_4} (cap {aula_4.capacidad})")

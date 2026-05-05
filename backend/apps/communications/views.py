@@ -1,3 +1,6 @@
+import re
+from urllib.parse import quote
+
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
@@ -7,12 +10,30 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.users.permissions import IsAdminJardinOrAbove
-
 from apps.students.models import Guardian
 
 from .models import Communication
 from .serializers import CommunicationSerializer
+
+
+def _normalizar_telefono(telefono):
+    if not telefono:
+        return None
+    solo_digitos = re.sub(r"\D", "", telefono)
+    if not solo_digitos:
+        return None
+    if len(solo_digitos) == 9:
+        solo_digitos = "51" + solo_digitos
+    return solo_digitos
+
+
+def _resolver_destinatarios(communication):
+    guardians_qs = Guardian.objects.select_related("student").filter(
+        student__estado="ACTIVO"
+    )
+    if communication.tipo == Communication.Tipo.POR_AULA and communication.classroom:
+        guardians_qs = guardians_qs.filter(student__classroom=communication.classroom)
+    return guardians_qs
 
 
 class CommunicationViewSet(viewsets.ModelViewSet):
@@ -25,13 +46,42 @@ class CommunicationViewSet(viewsets.ModelViewSet):
     ordering_fields = ["created_at", "fecha_envio"]
     ordering = ["-created_at"]
 
-    @action(detail=True, methods=["post"], url_path="enviar", permission_classes=[IsAdminJardinOrAbove])
+    @action(detail=True, methods=["get"], url_path="destinatarios")
+    def destinatarios(self, request, pk=None):
+        """Devuelve apoderados únicos (deduplicados por teléfono/correo)."""
+        communication = self.get_object()
+        if communication.tipo == Communication.Tipo.POR_AULA and not communication.classroom:
+            return Response(
+                {"error": "Comunicación por aula requiere un aula asignada."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        guardians = _resolver_destinatarios(communication).order_by(
+            "student__apellidos", "apellidos"
+        )
+
+        vistos = set()
+        data = []
+        for g in guardians:
+            # Clave de dedup: teléfono o email. Un mismo apoderado de varios
+            # hermanos solo aparece una vez.
+            key = _normalizar_telefono(g.telefono) or (g.email or "").lower()
+            if not key or key in vistos:
+                continue
+            vistos.add(key)
+            data.append({
+                "id": g.id,
+                "nombres": f"{g.nombres} {g.apellidos}",
+                "alumno": str(g.student),
+                "telefono": g.telefono,
+                "email": g.email or "",
+                "parentesco": g.parentesco,
+                "es_principal": g.es_principal,
+            })
+        return Response({"total": len(data), "destinatarios": data})
+
+    @action(detail=True, methods=["post"], url_path="enviar", permission_classes=[IsAuthenticated])
     def enviar(self, request, pk=None):
-        """
-        Marca la comunicación como enviada y envía email a los apoderados relevantes.
-        - GENERAL: todos los apoderados principales con email.
-        - POR_AULA: solo los apoderados principales de alumnos del aula.
-        """
+        """Envía la comunicación por email a los apoderados con correo registrado."""
         communication = self.get_object()
 
         if communication.enviado:
@@ -40,33 +90,26 @@ class CommunicationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Obtener emails de apoderados relevantes
-        guardians_qs = Guardian.objects.filter(
-            es_principal=True
-        ).exclude(email__isnull=True).exclude(email="")
-
-        if communication.tipo == Communication.Tipo.POR_AULA:
-            if not communication.classroom:
-                return Response(
-                    {"error": "Comunicación por aula requiere un aula asignada."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            guardians_qs = guardians_qs.filter(
-                student__classroom=communication.classroom,
-                student__estado="ACTIVO",
-            )
-        else:
-            guardians_qs = guardians_qs.filter(student__estado="ACTIVO")
-
-        emails = list(guardians_qs.values_list("email", flat=True).distinct())
-
-        if not emails:
+        if communication.tipo == Communication.Tipo.POR_AULA and not communication.classroom:
             return Response(
-                {"error": "No se encontraron apoderados con email para enviar."},
+                {"error": "Comunicación por aula requiere un aula asignada."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Enviar emails
+        guardians_qs = _resolver_destinatarios(communication)
+        # Deduplicar emails (un padre con varios hijos solo recibe 1 mail)
+        emails = sorted({
+            (e or "").strip().lower()
+            for e in guardians_qs.values_list("email", flat=True)
+            if e
+        })
+
+        if not emails:
+            return Response(
+                {"error": "No se encontraron apoderados con email registrado."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         errores = []
         enviados = 0
         for email in emails:
@@ -82,7 +125,6 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 errores.append({"email": email, "error": str(e)})
 
-        # Marcar como enviado solo si al menos un email fue enviado exitosamente
         if enviados > 0:
             communication.enviado = True
             communication.fecha_envio = timezone.now()
@@ -96,4 +138,62 @@ class CommunicationViewSet(viewsets.ModelViewSet):
                 "errores": errores,
             },
             status=status.HTTP_200_OK,
+        )
+
+    @action(detail=True, methods=["post"], url_path="whatsapp", permission_classes=[IsAuthenticated])
+    def whatsapp(self, request, pk=None):
+        """
+        Devuelve enlaces wa.me listos para abrir desde el navegador.
+        El frontend abre cada enlace en una pestaña; no requiere API externa ni costo.
+        """
+        communication = self.get_object()
+
+        if communication.tipo == Communication.Tipo.POR_AULA and not communication.classroom:
+            return Response(
+                {"error": "Comunicación por aula requiere un aula asignada."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        guardians_qs = _resolver_destinatarios(communication)
+        mensaje = f"*{communication.titulo}*\n\n{communication.contenido}"
+        mensaje_codificado = quote(mensaje)
+
+        enlaces = []
+        sin_telefono = 0
+        # Deduplicar por número normalizado (un padre de varios hijos = 1 chat)
+        vistos = set()
+        for g in guardians_qs:
+            telefono = _normalizar_telefono(g.telefono)
+            if not telefono:
+                sin_telefono += 1
+                continue
+            if telefono in vistos:
+                continue
+            vistos.add(telefono)
+            enlaces.append(
+                {
+                    "destinatario": f"{g.nombres} {g.apellidos}",
+                    "alumno": str(g.student),
+                    "telefono": g.telefono,
+                    "url": f"https://wa.me/{telefono}?text={mensaje_codificado}",
+                }
+            )
+
+        if not enlaces:
+            return Response(
+                {"error": "No hay apoderados con teléfono válido."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if not communication.enviado:
+            communication.enviado = True
+            communication.fecha_envio = timezone.now()
+            communication.save(update_fields=["enviado", "fecha_envio"])
+
+        return Response(
+            {
+                "total": len(enlaces),
+                "sin_telefono": sin_telefono,
+                "enlaces": enlaces,
+            }
         )

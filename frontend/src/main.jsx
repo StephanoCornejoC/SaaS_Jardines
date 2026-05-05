@@ -14,8 +14,28 @@ ReactDOM.createRoot(document.getElementById("root")).render(
         locale={esES}
         theme={{
           token: {
-            colorPrimary: "#1890ff",
-            borderRadius: 6,
+            colorPrimary: "#0d9488",
+            colorLink: "#0d9488",
+            colorLinkHover: "#0f766e",
+            borderRadius: 8,
+            borderRadiusLG: 10,
+            colorBgLayout: "#f0f2f5",
+          },
+          components: {
+            Menu: {
+              darkItemSelectedBg: "#0d9488",
+              darkItemSelectedColor: "#ffffff",
+            },
+            Button: {
+              borderRadius: 8,
+            },
+            Table: {
+              borderRadius: 8,
+              headerBg: "#fafafa",
+            },
+            Card: {
+              borderRadius: 10,
+            },
           },
         }}
       >

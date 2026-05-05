@@ -1,9 +1,12 @@
+import mimetypes
 import os
 
 from django.conf import settings
 from django.http import FileResponse, Http404
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+
+_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf", ".xlsx"}
 
 
 @api_view(["GET"])
@@ -14,12 +17,23 @@ def protected_media(request, path):
 
     SECURITY: Media files (student photos, QR codes) must not be publicly
     accessible. This view enforces JWT authentication before serving any
-    file from MEDIA_ROOT.
+    file from MEDIA_ROOT and restricts allowed file extensions.
     """
     file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
+
     # Prevent directory traversal attacks
     if not file_path.startswith(str(settings.MEDIA_ROOT)):
         raise Http404
+
     if not os.path.exists(file_path):
         raise Http404
-    return FileResponse(open(file_path, "rb"))
+
+    _, ext = os.path.splitext(file_path)
+    if ext.lower() not in _ALLOWED_EXTENSIONS:
+        raise Http404
+
+    content_type, _ = mimetypes.guess_type(file_path)
+    return FileResponse(
+        open(file_path, "rb"),
+        content_type=content_type or "application/octet-stream",
+    )

@@ -26,12 +26,12 @@ class TestCalculateDailyMetrics:
         StudentFactory(estado="ACTIVO")
         StudentFactory(estado="ACTIVO")
         StudentFactory(estado="RETIRADO")  # should not count
-        TeacherFactory(activo=True)
-        TeacherFactory(activo=False)  # should not count
+        TeacherFactory()
+        TeacherFactory()
 
         metric = calculate_daily_metrics()
         assert metric.total_alumnos == 2
-        assert metric.total_profesores == 1
+        assert metric.total_profesores == 2
 
     def test_financial_metrics(self, tenant):
         today = date.today()

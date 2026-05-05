@@ -1,10 +1,8 @@
 """Unit tests for classrooms.models."""
 
 import pytest
-from datetime import date
 
 from apps.classrooms.factories import ClassroomFactory
-from apps.classrooms.models import Classroom
 from apps.students.factories import StudentFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.unit]
@@ -30,15 +28,13 @@ class TestClassroomModel:
         StudentFactory(classroom=classroom)
         assert classroom.disponible is False
 
-    def test_unique_together(self, tenant):
-        current_year = date.today().year
-        ClassroomFactory(nombre="Patitos", anio_escolar=current_year)
+    def test_nombre_unico(self, tenant):
+        ClassroomFactory(nombre="Patitos")
         with pytest.raises(Exception):
-            ClassroomFactory(nombre="Patitos", anio_escolar=current_year)
+            ClassroomFactory(nombre="Patitos")
 
     def test_str(self, tenant):
-        classroom = ClassroomFactory(nombre="Ositos", nivel_edad=4, anio_escolar=2026)
+        classroom = ClassroomFactory(nombre="Ositos", nivel_edad=4)
         result = str(classroom)
         assert "Ositos" in result
         assert "4" in result
-        assert "2026" in result

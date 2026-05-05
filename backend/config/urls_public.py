@@ -1,7 +1,7 @@
-"""URL configuration for the public schema (no tenant)."""
+"""URL configuration for the public schema (panel del SUPERADMIN)."""
 from django.contrib import admin
-from django.urls import path
 from django.http import JsonResponse
+from django.urls import path
 
 
 def health_check(request):
@@ -9,6 +9,7 @@ def health_check(request):
 
 
 urlpatterns = [
-    path("corem-panel-x9k2/", admin.site.urls),
+    # Admin del superadmin — rutas del jardín se registran en CoremAdminSite.get_urls()
+    path("admin/", admin.site.urls),
     path("health/", health_check),
 ]

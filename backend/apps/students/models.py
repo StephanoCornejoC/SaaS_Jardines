@@ -20,6 +20,13 @@ class Student(models.Model):
     fecha_nacimiento = models.DateField(verbose_name="Fecha de nacimiento")
     genero = models.CharField(max_length=1, choices=Genero.choices, verbose_name="Género")
     foto = models.ImageField(upload_to="students/fotos/", null=True, blank=True)
+    ficha_matricula = models.FileField(
+        upload_to="students/fichas/",
+        null=True,
+        blank=True,
+        verbose_name="Ficha de matrícula (PDF)",
+        help_text="Documento oficial de matrícula firmado por el apoderado",
+    )
     classroom = models.ForeignKey(
         "classrooms.Classroom",
         on_delete=models.SET_NULL,

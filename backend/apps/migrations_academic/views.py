@@ -3,8 +3,6 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.users.permissions import IsAdminJardinOrAbove, IsSuperadmin
-
 from .models import AcademicMigration
 from .serializers import (
     AcademicMigrationSerializer,
@@ -14,7 +12,7 @@ from .services import cleanup_graduated, execute_migration, preview_migration
 
 
 class AcademicMigrationViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAdminJardinOrAbove]
+    permission_classes = [IsAuthenticated]
     queryset = AcademicMigration.objects.prefetch_related(
         "details__student", "details__aula_origen", "details__aula_destino"
     ).select_related("ejecutado_por")
@@ -37,7 +35,7 @@ class AcademicMigrationViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = MigrationPreviewSerializer(preview_data)
         return Response(serializer.data)
 
-    @action(detail=False, methods=["post"], url_path="ejecutar", permission_classes=[IsSuperadmin])
+    @action(detail=False, methods=["post"], url_path="ejecutar")
     def ejecutar(self, request):
         """
         Ejecuta la migracion academica.
@@ -60,38 +58,35 @@ class AcademicMigrationViewSet(viewsets.ReadOnlyModelViewSet):
         serializer = AcademicMigrationSerializer(migration)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=["post"], url_path="cleanup-egresados", permission_classes=[IsSuperadmin])
-    def cleanup_egresados(self, request):
+    @action(detail=False, methods=["post"], url_path="cleanup-antiguos")
+    def cleanup_antiguos(self, request):
         """
-        Anonimiza datos de alumnos egresados antiguos.
-        Parametro opcional 'years_to_keep' (default: 2, minimo: 1, maximo: 10).
+        Elimina por completo los datos de alumnos egresados hace más de
+        `years_to_keep` años (default 2, mínimo 1, máximo 10).
+        Conserva los `MonthlyClosure` (totales mensuales) — esos son
+        permanentes y respaldan los reportes históricos.
         """
         years_to_keep = request.data.get("years_to_keep", 2)
-
         try:
             years_to_keep = int(years_to_keep)
         except (TypeError, ValueError):
             return Response(
-                {"error": "years_to_keep debe ser un numero entero."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if years_to_keep < 1 or years_to_keep > 10:
-            return Response(
-                {"error": "years_to_keep debe estar entre 1 y 10."},
+                {"error": "years_to_keep debe ser un número entero."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
-            count = cleanup_graduated(years_to_keep)
+            resumen = cleanup_graduated(years_to_keep)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
-            return Response(
-                {"error": str(e)}, status=status.HTTP_400_BAD_REQUEST
-            )
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response(
-            {
-                "message": f"Se anonimizaron {count} alumnos egresados.",
-                "total_procesados": count,
-            }
-        )
+        return Response({
+            "message": (
+                f"Limpieza completa: {resumen['alumnos_eliminados']} alumno(s) "
+                f"eliminados y {resumen['transacciones_eliminadas']} transacción(es) "
+                f"de caja purgadas. Cierres mensuales conservados."
+            ),
+            **resumen,
+        })

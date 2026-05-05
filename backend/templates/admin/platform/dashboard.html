@@ -1,0 +1,173 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    .corem-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:24px; }
+    .kpi-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+    .kpi-card.alert { border-left:4px solid #ef4444; }
+    .kpi-card .label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#64748b; margin-bottom:4px; }
+    .kpi-card .value { font-size:24px; font-weight:700; color:#0f172a; line-height:1.1; }
+    .kpi-card .hint { font-size:11px; color:#94a3b8; margin-top:4px; }
+    .corem-section { background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:18px; margin-bottom:18px; }
+    .corem-section h2 { font-size:14px; font-weight:600; color:#0f172a; margin:0 0 12px; }
+    .corem-row { display:grid; grid-template-columns:2fr 1fr; gap:18px; }
+    @media (max-width:900px){ .corem-row{grid-template-columns:1fr;} }
+    .moroso-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .moroso-table th, .moroso-table td { text-align:left; padding:6px 10px; border-bottom:1px solid #f1f5f9; }
+    .moroso-table th { background:#f8fafc; font-weight:600; color:#475569; }
+    .alert-box { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:12px 14px; border-radius:8px; margin-bottom:18px; }
+    .actions { margin-bottom:16px; }
+    .actions a { display:inline-block; padding:6px 12px; background:#0d9488; color:#fff; border-radius:6px; text-decoration:none; font-size:12px; margin-right:8px; }
+    /* Wrappers de altura fija para los canvas de Chart.js (evita crecimiento infinito) */
+    .chart-wrap { position: relative; height: 280px; width: 100%; }
+    .chart-wrap canvas { max-width: 100% !important; }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <h1 style="font-size:24px;font-weight:700;margin-bottom:18px;color:#0f172a;">Dashboard</h1>
+
+  {% if morosos_total %}
+    <div class="alert-box">
+      ⚠️ <b>Atención:</b> hay {{ morosos_total }} cobro(s) vencido(s) sin pagar.
+      Revisa la sección "Cobros mensuales" o la tabla más abajo.
+    </div>
+  {% endif %}
+
+  <div class="corem-grid">
+    <div class="kpi-card">
+      <div class="label">Jardines totales</div>
+      <div class="value">{{ total_jardines }}</div>
+      <div class="hint">{{ activos }} activos · {{ bloqueados }} bloqueados</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Ingreso recurrente (MRR)</div>
+      <div class="value" style="color:#0d9488">S/ {{ mrr|floatformat:2 }}</div>
+      <div class="hint">Esperado mes a mes</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">A cobrar este mes</div>
+      <div class="value">S/ {{ total_a_cobrar|floatformat:2 }}</div>
+      <div class="hint">Suma de cobros emitidos</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Cobrado</div>
+      <div class="value" style="color:#10b981">S/ {{ cobrado|floatformat:2 }}</div>
+      <div class="hint">Pagados este mes</div>
+    </div>
+    <div class="kpi-card {% if pendiente %}alert{% endif %}">
+      <div class="label">Pendiente</div>
+      <div class="value" style="color:#ef4444">S/ {{ pendiente|floatformat:2 }}</div>
+      <div class="hint">Por cobrar</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Costos del mes</div>
+      <div class="value" style="color:#7c3aed">S/ {{ costos_mes|floatformat:2 }}</div>
+      <div class="hint">Hosting, dominio, etc.</div>
+    </div>
+    <div class="kpi-card">
+      <div class="label">Margen del mes</div>
+      <div class="value" style="color:{% if margen >= 0 %}#10b981{% else %}#ef4444{% endif %}">
+        S/ {{ margen|floatformat:2 }}
+      </div>
+      <div class="hint">Cobrado − costos</div>
+    </div>
+  </div>
+
+  <div class="corem-row">
+    <div class="corem-section">
+      <h2>Ingresos vs Costos (12 meses)</h2>
+      <div class="chart-wrap">
+        <canvas id="chart-trend"></canvas>
+      </div>
+    </div>
+    <div class="corem-section">
+      <h2>Distribución de jardines por estado</h2>
+      <div class="chart-wrap">
+        <canvas id="chart-dist"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="corem-section">
+    <h2>Top morosos (cobros vencidos sin pagar)</h2>
+    {% if morosos %}
+      <table class="moroso-table">
+        <thead>
+          <tr>
+            <th>Jardín</th>
+            <th>Periodo</th>
+            <th>Monto</th>
+            <th>Vencido hace</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in morosos %}
+            <tr>
+              <td><b>{{ m.tenant.nombre }}</b></td>
+              <td>{{ m.mes|stringformat:"02d" }}/{{ m.anio }}</td>
+              <td>S/ {{ m.monto|floatformat:2 }}</td>
+              <td><span style="color:#ef4444;font-weight:600">{{ m.dias_vencida }} días</span></td>
+              <td>
+                <a href="{% url 'admin:platform_platforminvoice_change' m.id %}" style="font-size:11px;color:#0d9488">Ver / marcar pagada →</a>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p style="color:#64748b;font-size:13px;margin:0;">🎉 No hay cobros vencidos. Todo al día.</p>
+    {% endif %}
+  </div>
+
+  <script>
+    const series = {{ series_json|safe }};
+    const labels = Object.keys(series);
+    const ingresos = labels.map(k => series[k].ingresos);
+    const costos = labels.map(k => series[k].costos);
+
+    new Chart(document.getElementById('chart-trend'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Ingresos', data: ingresos, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,.1)', tension: .3, fill: true },
+          { label: 'Costos',   data: costos,   borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.1)', tension: .3, fill: true }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { beginAtZero: true, ticks: { callback: v => 'S/ ' + v } }
+        }
+      }
+    });
+
+    const dist = {{ distribucion_json|safe }};
+    const distLabels = { TRIAL: 'Trial', ACTIVA: 'Activa', MOROSA: 'Morosa', BLOQUEADA: 'Bloqueada', CANCELADA: 'Cancelada' };
+    const distColors = { TRIAL: '#3b82f6', ACTIVA: '#10b981', MOROSA: '#f59e0b', BLOQUEADA: '#ef4444', CANCELADA: '#6b7280' };
+
+    new Chart(document.getElementById('chart-dist'), {
+      type: 'doughnut',
+      data: {
+        labels: dist.map(d => distLabels[d.estado] || d.estado),
+        datasets: [{
+          data: dist.map(d => d.c),
+          backgroundColor: dist.map(d => distColors[d.estado] || '#64748b')
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+  </script>
+{% endblock %}

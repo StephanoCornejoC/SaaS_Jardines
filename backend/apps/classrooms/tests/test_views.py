@@ -1,7 +1,6 @@
 """API / view tests for classrooms app."""
 
 import pytest
-from datetime import date
 
 from apps.classrooms.factories import ClassroomFactory
 from apps.teachers.factories import TeacherFactory
@@ -25,9 +24,7 @@ class TestClassroomViewSet:
             "nombre": "Estrellitas",
             "nivel_edad": 3,
             "capacidad": 20,
-            "anio_escolar": date.today().year,
             "profesor_titular": teacher.pk,
-            "activo": True,
         }
         response = client.post("/api/v1/classrooms/", data, format="json")
         assert response.status_code == 201
@@ -38,7 +35,6 @@ class TestClassroomViewSet:
             "nombre": "Forbidden",
             "nivel_edad": 2,
             "capacidad": 15,
-            "anio_escolar": date.today().year,
         }
         response = client.post("/api/v1/classrooms/", data, format="json")
         assert response.status_code == 403

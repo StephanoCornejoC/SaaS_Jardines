@@ -10,15 +10,20 @@ class CashCategoryAdmin(ModelAdmin):
     list_filter = ("tipo", "activo", "es_sistema")
     search_fields = ("nombre",)
     readonly_fields = ("created_at",)
+    list_per_page = 25
 
 
 @admin.register(CashTransaction)
 class CashTransactionAdmin(ModelAdmin):
     list_display = ("descripcion", "categoria", "monto", "tipo", "fecha", "creado_por")
+    list_display_links = ("descripcion",)
     list_filter = ("tipo", "categoria", "fecha")
     search_fields = ("descripcion",)
+    autocomplete_fields = ("categoria",)
     readonly_fields = ("created_at", "updated_at", "creado_por")
     ordering = ("-fecha",)
+    list_per_page = 30
+    date_hierarchy = "fecha"
 
 
 @admin.register(MonthlyClosure)

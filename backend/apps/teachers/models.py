@@ -19,7 +19,6 @@ class Teacher(models.Model):
     telefono = models.CharField(max_length=20)
     email = models.EmailField(null=True, blank=True)
     fecha_ingreso = models.DateField(verbose_name="Fecha de ingreso")
-    activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

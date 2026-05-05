@@ -14,6 +14,7 @@ class CashTransactionSerializer(serializers.ModelSerializer):
     categoria_nombre = serializers.CharField(
         source="categoria.nombre", read_only=True
     )
+    creado_por_nombre = serializers.SerializerMethodField()
 
     class Meta:
         model = CashTransaction
@@ -28,10 +29,18 @@ class CashTransactionSerializer(serializers.ModelSerializer):
             "referencia_pago",
             "referencia_teacher_payment",
             "creado_por",
+            "creado_por_nombre",
             "created_at",
             "updated_at",
         )
         read_only_fields = ("id", "creado_por", "created_at", "updated_at")
+
+    def get_creado_por_nombre(self, obj):
+        if not obj.creado_por:
+            return None
+        u = obj.creado_por
+        full = (u.get_full_name() or "").strip()
+        return full or u.email
 
     def create(self, validated_data):
         request = self.context.get("request")

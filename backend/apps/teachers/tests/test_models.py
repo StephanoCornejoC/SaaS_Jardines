@@ -14,7 +14,6 @@ class TestTeacherModel:
     def test_creation(self, tenant):
         teacher = TeacherFactory()
         assert teacher.pk is not None
-        assert teacher.activo is True
 
     def test_str(self, tenant):
         teacher = TeacherFactory(nombres="Ana", apellidos="Torres")

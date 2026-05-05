@@ -13,10 +13,11 @@ class ClassroomAdmin(ModelAdmin):
         "alumnos_count",
         "profesor_titular",
         "profesor_auxiliar",
-        "anio_escolar",
-        "activo",
     )
-    list_filter = ("nivel_edad", "anio_escolar", "activo")
+    list_display_links = ("nombre",)
+    list_filter = ("nivel_edad",)
     search_fields = ("nombre", "profesor_titular__apellidos", "profesor_auxiliar__apellidos")
+    autocomplete_fields = ("profesor_titular", "profesor_auxiliar")
     readonly_fields = ("created_at", "updated_at")
-    ordering = ("anio_escolar", "nivel_edad", "nombre")
+    ordering = ("nivel_edad", "nombre")
+    list_per_page = 25

@@ -29,7 +29,6 @@ class TestEnrollmentViewSet:
             "classroom": classroom.pk,
             "anio_escolar": date.today().year,
             "costo_matricula": "250.00",
-            "estado": "PENDIENTE",
         }
         response = client.post("/api/v1/enrollments/", data, format="json")
         assert response.status_code == 201

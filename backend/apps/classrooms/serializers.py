@@ -19,8 +19,8 @@ class ClassroomListSerializer(serializers.ModelSerializer):
             "nivel_edad",
             "capacidad",
             "alumnos_count",
+            "profesor_titular",
             "profesor_titular_nombre",
-            "activo",
         )
 
 

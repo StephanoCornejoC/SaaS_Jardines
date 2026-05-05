@@ -11,7 +11,8 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from apps.users.permissions import IsAdminJardinOrAbove
+from rest_framework.permissions import IsAuthenticated
+
 from shared.validators import validate_month_param, validate_year_param
 
 
@@ -53,23 +54,33 @@ class ReportViewSet(viewsets.ViewSet):
     """
     ViewSet para generación de reportes Excel.
     """
-    permission_classes = [IsAdminJardinOrAbove]
+    permission_classes = [IsAuthenticated]
 
     @action(detail=False, methods=["get"], url_path="morosidad-excel")
     def morosidad_excel(self, request):
-        """Genera reporte Excel de pagos vencidos (morosidad)."""
+        """
+        Genera reporte Excel de morosidad: pensiones cuyo vencimiento ya pasó
+        y siguen pendientes (no pagadas ni exoneradas). Solo meses lectivos.
+        """
         from apps.payments.models import Payment
 
         mes = validate_month_param(request.query_params.get("mes"))
         anio = validate_year_param(request.query_params.get("anio")) or date.today().year
 
+        today = date.today()
         payments_qs = Payment.objects.filter(
-            estado=Payment.Estado.VENCIDO,
-        ).select_related("student", "student__classroom")
+            anio=anio,
+            mes__gte=3,
+            mes__lte=12,
+            fecha_vencimiento__lt=today,
+        ).exclude(
+            estado__in=[Payment.Estado.PAGADO, Payment.Estado.EXONERADO],
+        ).select_related("student", "student__classroom").order_by(
+            "student__apellidos", "student__nombres", "mes",
+        )
 
         if mes:
             payments_qs = payments_qs.filter(mes=mes)
-        payments_qs = payments_qs.filter(anio=anio)
 
         wb = Workbook()
         ws = wb.active
@@ -116,7 +127,7 @@ class ReportViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=["get"], url_path="alumnos-excel")
     def alumnos_excel(self, request):
-        """Genera reporte Excel con la lista de alumnos."""
+        """Genera reporte Excel con la lista de alumnos agrupada por aula."""
         from apps.students.models import Student
 
         estado = request.query_params.get("estado", "ACTIVO")
@@ -124,6 +135,12 @@ class ReportViewSet(viewsets.ViewSet):
         students_qs = Student.objects.select_related("classroom")
         if estado:
             students_qs = students_qs.filter(estado=estado)
+        students_qs = students_qs.order_by(
+            "classroom__nivel_edad",
+            "classroom__nombre",
+            "apellidos",
+            "nombres",
+        )
 
         wb = Workbook()
         ws = wb.active
@@ -136,44 +153,63 @@ class ReportViewSet(viewsets.ViewSet):
             "Fecha Nacimiento",
             "Edad",
             "Género",
-            "Aula",
             "Estado",
             "Fecha Ingreso",
         ]
-        _style_header(ws, headers)
 
-        for row_idx, student in enumerate(students_qs, 2):
-            ws.cell(row=row_idx, column=1, value=student.apellidos)
-            ws.cell(row=row_idx, column=2, value=student.nombres)
-            ws.cell(row=row_idx, column=3, value=student.dni)
-            ws.cell(
-                row=row_idx,
-                column=4,
-                value=student.fecha_nacimiento.strftime("%d/%m/%Y"),
+        # Agrupar por aula. Cada grupo: header de aula + headers + filas + fila vacía.
+        from collections import OrderedDict
+
+        groups = OrderedDict()
+        for s in students_qs:
+            key = (
+                s.classroom.id if s.classroom else None,
+                str(s.classroom) if s.classroom else "Sin aula asignada",
             )
-            ws.cell(row=row_idx, column=5, value=student.edad)
-            ws.cell(row=row_idx, column=6, value=student.get_genero_display())
-            ws.cell(
-                row=row_idx,
-                column=7,
-                value=str(student.classroom) if student.classroom else "Sin aula",
-            )
-            ws.cell(row=row_idx, column=8, value=student.get_estado_display())
-            ws.cell(
-                row=row_idx,
-                column=9,
-                value=student.fecha_ingreso.strftime("%d/%m/%Y"),
-            )
+            groups.setdefault(key, []).append(s)
+
+        group_font = Font(bold=True, size=12, color="0F766E")
+        group_fill = PatternFill(start_color="CCFBF1", end_color="CCFBF1", fill_type="solid")
+
+        row_idx = 1
+        for (_aula_id, aula_label), alumnos in groups.items():
+            # Título de aula
+            ws.cell(row=row_idx, column=1, value=f"Aula: {aula_label}  ({len(alumnos)} alumno(s))")
+            ws.cell(row=row_idx, column=1).font = group_font
+            ws.cell(row=row_idx, column=1).fill = group_fill
+            ws.merge_cells(start_row=row_idx, start_column=1, end_row=row_idx, end_column=len(headers))
+            row_idx += 1
+
+            # Encabezado por grupo
+            _style_header(ws, headers, row=row_idx)
+            row_idx += 1
+
+            for s in alumnos:
+                ws.cell(row=row_idx, column=1, value=s.apellidos)
+                ws.cell(row=row_idx, column=2, value=s.nombres)
+                ws.cell(row=row_idx, column=3, value=s.dni)
+                ws.cell(row=row_idx, column=4, value=s.fecha_nacimiento.strftime("%d/%m/%Y"))
+                ws.cell(row=row_idx, column=5, value=s.edad)
+                ws.cell(row=row_idx, column=6, value=s.get_genero_display())
+                ws.cell(row=row_idx, column=7, value=s.get_estado_display())
+                ws.cell(row=row_idx, column=8, value=s.fecha_ingreso.strftime("%d/%m/%Y"))
+                row_idx += 1
+
+            # Fila en blanco entre grupos
+            row_idx += 1
 
         for col in range(1, len(headers) + 1):
-            ws.column_dimensions[chr(64 + col)].width = 18
+            ws.column_dimensions[chr(64 + col)].width = 20
 
         filename = f"alumnos_{estado.lower()}.xlsx"
         return _build_response(wb, filename)
 
     @action(detail=False, methods=["get"], url_path="asistencia-excel")
     def asistencia_excel(self, request):
-        """Genera reporte Excel de asistencia por aula y mes."""
+        """
+        Genera reporte Excel de asistencia. Si no se pasa classroom_id, incluye
+        todas las aulas (cada una en una hoja separada).
+        """
         from apps.attendance.models import Attendance
         from apps.classrooms.models import Classroom
 
@@ -181,50 +217,62 @@ class ReportViewSet(viewsets.ViewSet):
         mes = validate_month_param(request.query_params.get("mes")) or date.today().month
         anio = validate_year_param(request.query_params.get("anio")) or date.today().year
 
-        if not classroom_id:
+        if classroom_id:
+            try:
+                classrooms = [Classroom.objects.get(pk=int(classroom_id))]
+            except Classroom.DoesNotExist:
+                return Response(
+                    {"error": "Aula no encontrada."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        else:
+            classrooms = list(Classroom.objects.order_by("nivel_edad", "nombre"))
+
+        if not classrooms:
             return Response(
-                {"error": "Se requiere el parámetro classroom_id."},
+                {"error": "No hay aulas registradas."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            classroom = Classroom.objects.get(pk=int(classroom_id))
-        except Classroom.DoesNotExist:
-            return Response(
-                {"error": "Aula no encontrada."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        attendances = Attendance.objects.filter(
-            classroom=classroom,
-            fecha__month=mes,
-            fecha__year=anio,
-        ).select_related("student")
-
-        # Agrupar por alumno
-        report = (
-            attendances.values("student__apellidos", "student__nombres")
-            .annotate(
-                total_presentes=Count("id", filter=Q(estado=Attendance.Estado.PRESENTE)),
-                total_ausentes=Count("id", filter=Q(estado=Attendance.Estado.AUSENTE)),
-                total_tardanzas=Count("id", filter=Q(estado=Attendance.Estado.TARDANZA)),
-                total_justificados=Count(
-                    "id", filter=Q(estado=Attendance.Estado.JUSTIFICADO)
-                ),
-                total_dias=Count("id"),
-            )
-            .order_by("student__apellidos", "student__nombres")
-        )
-
         wb = Workbook()
-        ws = wb.active
-        ws.title = "Asistencia"
+        wb.remove(wb.active)  # quitar la hoja por defecto
 
-        # Titulo
+        for classroom in classrooms:
+            attendances = Attendance.objects.filter(
+                classroom=classroom,
+                fecha__month=mes,
+                fecha__year=anio,
+            ).select_related("student")
+
+            report = (
+                attendances.values("student__apellidos", "student__nombres")
+                .annotate(
+                    total_presentes=Count("id", filter=Q(estado=Attendance.Estado.PRESENTE)),
+                    total_ausentes=Count("id", filter=Q(estado=Attendance.Estado.AUSENTE)),
+                    total_tardanzas=Count("id", filter=Q(estado=Attendance.Estado.TARDANZA)),
+                    total_justificados=Count(
+                        "id", filter=Q(estado=Attendance.Estado.JUSTIFICADO)
+                    ),
+                    total_dias=Count("id"),
+                )
+                .order_by("student__apellidos", "student__nombres")
+            )
+
+            sheet_name = classroom.nombre[:31]  # Excel limita a 31 chars
+            ws = wb.create_sheet(title=sheet_name)
+            self._render_attendance_sheet(ws, classroom, mes, anio, report)
+
+        if not wb.sheetnames:
+            wb.create_sheet(title="Sin datos")
+
+        suffix = classrooms[0].nombre if len(classrooms) == 1 else "todas"
+        filename = f"asistencia_{suffix}_{mes}_{anio}.xlsx"
+        return _build_response(wb, filename)
+
+    def _render_attendance_sheet(self, ws, classroom, mes, anio, report):
         ws.merge_cells("A1:H1")
         title_cell = ws.cell(
-            row=1,
-            column=1,
+            row=1, column=1,
             value=f"Reporte de Asistencia - {classroom.nombre} - {mes}/{anio}",
         )
         title_cell.font = Font(bold=True, size=14)
@@ -256,9 +304,6 @@ class ReportViewSet(viewsets.ViewSet):
 
         for col in range(1, len(headers) + 1):
             ws.column_dimensions[chr(64 + col)].width = 18
-
-        filename = f"asistencia_{classroom.nombre}_{mes}_{anio}.xlsx"
-        return _build_response(wb, filename)
 
     @action(detail=False, methods=["get"], url_path="cashflow-excel")
     def cashflow_excel(self, request):

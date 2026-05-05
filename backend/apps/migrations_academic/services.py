@@ -17,17 +17,14 @@ def preview_migration(anio_origen):
     """
     anio_destino = anio_origen + 1
 
-    # Obtener alumnos activos con aula asignada en el anio origen
+    # Obtener alumnos activos con aula asignada
     students = Student.objects.filter(
         estado=Student.Estado.ACTIVO,
-        classroom__anio_escolar=anio_origen,
+        classroom__isnull=False,
     ).select_related("classroom")
 
-    # Obtener aulas del anio destino
-    aulas_destino = {
-        aula.nivel_edad: aula
-        for aula in Classroom.objects.filter(anio_escolar=anio_destino, activo=True)
-    }
+    # Las aulas son permanentes; basta con indexarlas por nivel_edad
+    aulas_destino = {aula.nivel_edad: aula for aula in Classroom.objects.all()}
 
     preview = {
         "anio_origen": anio_origen,
@@ -108,17 +105,13 @@ def execute_migration(anio_origen, user):
         status=AcademicMigration.Status.EJECUTADO,
     )
 
-    # Obtener alumnos activos
+    # Obtener alumnos activos con aula asignada
     students = Student.objects.filter(
         estado=Student.Estado.ACTIVO,
-        classroom__anio_escolar=anio_origen,
+        classroom__isnull=False,
     ).select_related("classroom")
 
-    # Obtener aulas del anio destino
-    aulas_destino = {
-        aula.nivel_edad: aula
-        for aula in Classroom.objects.filter(anio_escolar=anio_destino, activo=True)
-    }
+    aulas_destino = {aula.nivel_edad: aula for aula in Classroom.objects.all()}
 
     total_migrados = 0
 
@@ -170,52 +163,78 @@ def execute_migration(anio_origen, user):
     return migration
 
 
-def cleanup_graduated(years_to_keep=2):
+def cleanup_old_data(years_to_keep=2):
     """
-    Busca alumnos EGRESADO con mas de years_to_keep anios desde su ultimo
-    detalle de migracion y los anonimiza (elimina datos personales sensibles).
-    Usa soft-delete: anonimiza datos y marca estado ELIMINADO en lugar de
-    borrar registros relacionados.
-    Retorna la cantidad de alumnos procesados.
+    Elimina por completo los datos de alumnos egresados hace más de
+    `years_to_keep` años. Conserva los `MonthlyClosure` (totales agregados).
+
+    Antes de eliminar, asegura que cada mes con transacciones del periodo a
+    purgar tenga su `MonthlyClosure` (auto-sello del periodo).
+
+    Cascadas que se aplican al borrar `Student`:
+        - Guardian (CASCADE)
+        - MedicalRecord (CASCADE)
+        - Enrollment (CASCADE)
+        - MonthlyFee (CASCADE) → arrastra Payment
+        - Payment (CASCADE)
+        - Attendance (CASCADE)
+        - MigrationDetail (CASCADE)
+        - CashTransaction.referencia_pago (SET_NULL): la transacción queda
+          como "ingreso histórico sin referencia al alumno". Si la fecha de
+          la transacción también está fuera del periodo de retención, se
+          elimina (los totales ya quedaron en MonthlyClosure).
+
+    Devuelve un dict con el detalle de lo eliminado.
     """
+    from apps.cashflow.models import CashTransaction, MonthlyClosure
+    from apps.cashflow.services import close_month
+
     if years_to_keep < 1:
         raise ValueError("years_to_keep debe ser al menos 1")
+    if years_to_keep > 10:
+        raise ValueError("years_to_keep no debe exceder 10")
 
-    MAX_BATCH_SIZE = 500
-    cutoff_date = timezone.now() - timedelta(days=years_to_keep * 365)
+    today = timezone.now().date()
+    cutoff_year = today.year - years_to_keep
 
-    # Alumnos egresados con migracion antigua
-    old_graduated = Student.objects.filter(
-        estado=Student.Estado.EGRESADO,
-        migration_details__migration__fecha__lt=cutoff_date,
-    ).distinct()[:MAX_BATCH_SIZE]
+    with transaction.atomic():
+        # 1. Auto-sellar meses anteriores al cutoff que no tengan cierre.
+        anios_a_sellar = (
+            CashTransaction.objects.filter(fecha__year__lte=cutoff_year)
+            .values_list("fecha__year", "fecha__month")
+            .distinct()
+        )
+        cierres_creados = 0
+        for anio, mes in anios_a_sellar:
+            if not MonthlyClosure.objects.filter(mes=mes, anio=anio).exists():
+                close_month(mes, anio, user=None)
+                cierres_creados += 1
 
-    count = 0
-    for student in old_graduated:
-        # Anonimizar datos personales (soft-delete)
-        student.nombres = "ANONIMIZADO"
-        student.apellidos = "ANONIMIZADO"
-        student.dni = f"XXXX{student.id:04d}"
-        student.foto = None
-        student.estado = Student.Estado.ELIMINADO
-        student.save(update_fields=["nombres", "apellidos", "dni", "foto", "estado", "updated_at"])
+        # 2. Identificar alumnos a eliminar: egresados + sin actividad reciente.
+        alumnos_purgar = Student.objects.filter(
+            estado=Student.Estado.EGRESADO,
+        ).exclude(
+            enrollments__anio_escolar__gt=cutoff_year,
+        ).distinct()
+        total_alumnos = alumnos_purgar.count()
 
-        # Anonimizar apoderados en lugar de eliminarlos
-        for guardian in student.apoderados.all():
-            guardian.nombres = "ANONIMIZADO"
-            guardian.apellidos = "ANONIMIZADO"
-            guardian.dni = f"XXXX{guardian.id:04d}"
-            guardian.telefono = ""
-            guardian.email = ""
-            guardian.save(update_fields=["nombres", "apellidos", "dni", "telefono", "email"])
+        # 3. Eliminar transacciones de caja del periodo a purgar.
+        #    Sus totales ya están preservados en MonthlyClosure.
+        tx_purgar = CashTransaction.objects.filter(fecha__year__lte=cutoff_year)
+        total_tx = tx_purgar.count()
+        tx_purgar.delete()
 
-        # Anonimizar ficha medica en lugar de eliminarla
-        if hasattr(student, "ficha_medica") and student.ficha_medica:
-            ficha = student.ficha_medica
-            ficha.observaciones = "ANONIMIZADO"
-            ficha.alergias = "ANONIMIZADO"
-            ficha.save(update_fields=["observaciones", "alergias"])
+        # 4. Eliminar alumnos (cascade limpia el resto).
+        alumnos_purgar.delete()
 
-        count += 1
+    return {
+        "alumnos_eliminados": total_alumnos,
+        "transacciones_eliminadas": total_tx,
+        "meses_auto_sellados": cierres_creados,
+        "cutoff_year": cutoff_year,
+        "years_to_keep": years_to_keep,
+    }
 
-    return count
+
+# Alias retro-compatible: el endpoint y los tests usaban el nombre viejo.
+cleanup_graduated = cleanup_old_data

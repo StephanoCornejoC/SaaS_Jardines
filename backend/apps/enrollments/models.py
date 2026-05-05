@@ -3,11 +3,6 @@ from django.db import models
 
 
 class Enrollment(models.Model):
-    class Estado(models.TextChoices):
-        PENDIENTE = "PENDIENTE", "Pendiente"
-        PAGADA = "PAGADA", "Pagada"
-        ANULADA = "ANULADA", "Anulada"
-
     student = models.ForeignKey(
         "students.Student",
         on_delete=models.CASCADE,
@@ -25,9 +20,6 @@ class Enrollment(models.Model):
     anio_escolar = models.IntegerField(verbose_name="Año escolar")
     costo_matricula = models.DecimalField(
         max_digits=10, decimal_places=2, verbose_name="Costo de matrícula"
-    )
-    estado = models.CharField(
-        max_length=10, choices=Estado.choices, default=Estado.PENDIENTE
     )
     fecha_matricula = models.DateField(auto_now_add=True, verbose_name="Fecha de matrícula")
     observaciones = models.TextField(blank=True)
@@ -49,4 +41,4 @@ class Enrollment(models.Model):
         verbose_name_plural = "Matrículas"
 
     def __str__(self):
-        return f"{self.student} - {self.anio_escolar} ({self.get_estado_display()})"
+        return f"{self.student} - {self.anio_escolar}"

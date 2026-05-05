@@ -1,0 +1,92 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:tenants_tenant_changelist' %}">Jardines</a>
+    &rsaquo; Crear nuevo jardín
+  </div>
+{% endblock %}
+
+{% block content %}
+  <h1 style="margin-bottom: 8px;">Crear nuevo jardín</h1>
+  <p style="color:#64748b;margin-bottom: 24px;">
+    Esto creará el jardín en su propio schema, generará el dominio
+    <code>nombre.{{ base_domain }}</code> (puedes cambiarlo) y enviará al
+    director un correo con la contraseña inicial.
+  </p>
+
+  <form method="post" class="aligned" style="max-width: 720px;">
+    {% csrf_token %}
+
+    <fieldset class="module aligned">
+      <h2>Datos del jardín</h2>
+      {% for field in form %}
+        {% if field.name in 'nombre,ruc,telefono,direccion' %}
+          <div class="form-row">
+            <div>
+              <label for="{{ field.id_for_label }}"{% if field.field.required %} class="required"{% endif %}>{{ field.label }}:</label>
+              {{ field }}
+              {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+              {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </fieldset>
+
+    <fieldset class="module aligned">
+      <h2>Director(a) — admin del jardín</h2>
+      {% for field in form %}
+        {% if field.name in 'email_director,nombres_director,apellidos_director' %}
+          <div class="form-row">
+            <div>
+              <label for="{{ field.id_for_label }}"{% if field.field.required %} class="required"{% endif %}>{{ field.label }}:</label>
+              {{ field }}
+              {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+              {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </fieldset>
+
+    <fieldset class="module aligned">
+      <h2>Suscripción</h2>
+      {% for field in form %}
+        {% if field.name in 'precio_mensual,dias_trial,dia_cobro' %}
+          <div class="form-row">
+            <div>
+              <label for="{{ field.id_for_label }}"{% if field.field.required %} class="required"{% endif %}>{{ field.label }}:</label>
+              {{ field }}
+              {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+              {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </fieldset>
+
+    <fieldset class="module aligned collapse">
+      <h2>Configuración técnica (opcional)</h2>
+      {% for field in form %}
+        {% if field.name in 'schema_name,dominio' %}
+          <div class="form-row">
+            <div>
+              <label for="{{ field.id_for_label }}">{{ field.label }}:</label>
+              {{ field }}
+              {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
+              {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </fieldset>
+
+    <div class="submit-row">
+      <a href="{% url 'admin:tenants_tenant_changelist' %}" class="button">Cancelar</a>
+      <input type="submit" value="Crear jardín" class="default" style="background:#0d9488 !important">
+    </div>
+  </form>
+{% endblock %}

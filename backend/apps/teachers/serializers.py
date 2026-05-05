@@ -24,7 +24,17 @@ class TeacherListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Teacher
-        fields = ("id", "dni", "nombre_completo", "especialidad", "activo")
+        fields = (
+            "id",
+            "dni",
+            "nombre_completo",
+            "nombres",
+            "apellidos",
+            "especialidad",
+            "telefono",
+            "email",
+            "fecha_ingreso",
+        )
 
     def get_nombre_completo(self, obj):
         return f"{obj.apellidos}, {obj.nombres}"

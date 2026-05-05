@@ -61,8 +61,6 @@ select = [
 ignore = [
     # E501 es manejado por el formatter (line-length)
     "E501",
-    # W503 es obsoleto en PEP 8 moderno
-    "W503",
     # ANN101/ANN102: tipo de self/cls en metodos (no necesario)
     "ANN101",
     "ANN102",
@@ -124,7 +122,7 @@ classmethod-decorators = [
 
 [tool.ruff.lint.flake8-bugbear]
 # B950: line-length con 10% de tolerancia (similar a black)
-extend-default-select = ["B950"]
+extend-immutable-calls = []
 
 [tool.ruff.lint.flake8-bandit]
 # Reglas de seguridad habilitadas (subset critico):

@@ -16,4 +16,3 @@ class EnrollmentFactory(factory.django.DjangoModelFactory):
     classroom = factory.SubFactory(ClassroomFactory)
     anio_escolar = factory.LazyFunction(lambda: date.today().year)
     costo_matricula = Decimal("250.00")
-    estado = "PENDIENTE"

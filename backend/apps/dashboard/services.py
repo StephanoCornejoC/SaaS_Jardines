@@ -25,8 +25,8 @@ def calculate_daily_metrics():
     # Total alumnos activos
     total_alumnos = Student.objects.filter(estado=Student.Estado.ACTIVO).count()
 
-    # Total profesores activos
-    total_profesores = Teacher.objects.filter(activo=True).count()
+    # Total profesores
+    total_profesores = Teacher.objects.count()
 
     # Alumnos por nivel de edad
     alumnos_por_nivel = {}
@@ -54,19 +54,29 @@ def calculate_daily_metrics():
 
     balance_mes = ingresos_mes - egresos_mes
 
-    # Porcentaje de morosidad
-    total_pagos_mes = Payment.objects.filter(
-        mes=current_month, anio=current_year
-    ).count()
-    pagos_vencidos = Payment.objects.filter(
-        mes=current_month,
+    # Morosidad: pagos del año en curso (meses lectivos mar-dic) cuyo
+    # vencimiento ya pasó y NO están pagados ni exonerados.
+    # No depende de un campo "estado=VENCIDO" actualizado por cron — se
+    # calcula dinámicamente en cada request.
+    pagos_vencidos_qs = Payment.objects.filter(
         anio=current_year,
-        estado=Payment.Estado.VENCIDO,
+        mes__gte=3,
+        mes__lte=12,
+        fecha_vencimiento__lt=today,
+    ).exclude(
+        estado__in=[Payment.Estado.PAGADO, Payment.Estado.EXONERADO],
+    )
+    total_pagos_vencibles = Payment.objects.filter(
+        anio=current_year,
+        mes__gte=3,
+        mes__lte=12,
+        fecha_vencimiento__lt=today,
     ).count()
+    pagos_vencidos = pagos_vencidos_qs.count()
     porcentaje_morosidad = Decimal("0.00")
-    if total_pagos_mes > 0:
+    if total_pagos_vencibles > 0:
         porcentaje_morosidad = Decimal(
-            str(round(pagos_vencidos / total_pagos_mes * 100, 2))
+            str(round(pagos_vencidos / total_pagos_vencibles * 100, 2))
         )
 
     # Porcentaje de asistencia del mes
