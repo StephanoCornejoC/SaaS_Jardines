@@ -60,8 +60,12 @@ with schema_context("garabato"):
     from apps.cashflow.models import CashCategory, CashTransaction
     from apps.communications.models import Communication
 
-    # 3.1 Usuarios
+    # 3.1 Usuarios — el SaaS comercial solo tiene 1 rol funcional
+    # (ADMIN_JARDIN). El resto fue removido del enum de roles.
+    # Si quedaron en BD usuarios viejos con DIRECTOR/PROFESOR, los normalizamos.
     print("\n=== Creando usuarios ===")
+    User.objects.filter(role__in=["DIRECTOR", "SECRETARIA", "PROFESOR"]).delete()
+
     admin, _ = User.objects.update_or_create(
         email="admin@garabato.com",
         defaults={
@@ -74,22 +78,6 @@ with schema_context("garabato"):
     admin.set_password("Admin1234!")
     admin.save()
     print(f"  - {admin.email} / Admin1234!")
-
-    director, _ = User.objects.update_or_create(
-        email="director@garabato.com",
-        defaults={"first_name": "Carlos", "last_name": "Director", "role": "DIRECTOR", "is_active": True},
-    )
-    director.set_password("Director1234!")
-    director.save()
-    print(f"  - {director.email} / Director1234!")
-
-    profe_user, _ = User.objects.update_or_create(
-        email="profesor@garabato.com",
-        defaults={"first_name": "Ana", "last_name": "Profesora", "role": "PROFESOR", "is_active": True},
-    )
-    profe_user.set_password("Profesor1234!")
-    profe_user.save()
-    print(f"  - {profe_user.email} / Profesor1234!")
 
     # 3.2 Profesores
     print("\n=== Creando profesores ===")
@@ -164,20 +152,32 @@ with schema_context("garabato"):
         alumnos.append(stu)
     print(f"  - {len(alumnos)} alumnos creados")
 
-    # 3.5 Apoderados para el primero
+    # 3.5 Apoderados (uno principal por cada alumno; algunos con segundo apoderado)
     print("\n=== Creando apoderados ===")
-    Guardian.objects.update_or_create(
-        student=alumnos[0],
-        dni="40999001",
-        defaults={
-            "nombres": "Elena",
-            "apellidos": "Perez Ruiz",
-            "telefono": "987111222",
-            "email": "elena.perez@email.com",
-            "parentesco": "MADRE",
-            "es_principal": True,
-        },
-    )
+    apoderados_data = [
+        # (student_idx, dni, nombres, apellidos, telefono, email, parentesco, es_principal)
+        (0, "40999001", "Elena",   "Perez Ruiz",     "987111201", "elena.perez@email.com",     "MADRE", True),
+        (0, "40999002", "Roberto", "Perez Soto",     "987111202", "roberto.perez@email.com",   "PADRE", False),
+        (1, "40999011", "Lucia",   "Torres Vidal",   "987111211", "lucia.torres@email.com",    "MADRE", True),
+        (2, "40999021", "Carmen",  "Gomez Salas",    "987111221", "carmen.gomez@email.com",    "MADRE", True),
+        (2, "40999022", "Jorge",   "Gomez Linares",  "987111222", "jorge.gomez@email.com",     "PADRE", False),
+        (3, "40999031", "Patricia","Ramirez Cordova","987111231", "patricia.ramirez@email.com","MADRE", True),
+        (4, "40999041", "Hugo",    "Vargas Aliaga",  "987111241", "hugo.vargas@email.com",     "PADRE", True),
+    ]
+    for idx, dni, nombres, apellidos, telefono, email, parentesco, principal in apoderados_data:
+        Guardian.objects.update_or_create(
+            student=alumnos[idx],
+            dni=dni,
+            defaults={
+                "nombres": nombres,
+                "apellidos": apellidos,
+                "telefono": telefono,
+                "email": email,
+                "parentesco": parentesco,
+                "es_principal": principal,
+            },
+        )
+    print(f"  - {len(apoderados_data)} apoderados creados (1-2 por alumno)")
 
     # 3.6 Matriculas + Pensiones
     print("\n=== Creando matriculas y pensiones ===")
@@ -199,7 +199,6 @@ with schema_context("garabato"):
             defaults={
                 "classroom": stu.classroom,
                 "costo_matricula": Decimal("100.00"),
-                "estado": "ACTIVA",
             },
         )
         # Crear monthly fee
@@ -282,8 +281,6 @@ print("SEED DATA COMPLETO")
 print("=" * 50)
 print("\nCredenciales para E2E:")
 print("  admin@garabato.com     / Admin1234!     (ADMIN_JARDIN)")
-print("  director@garabato.com  / Director1234!  (DIRECTOR)")
-print("  profesor@garabato.com  / Profesor1234!  (PROFESOR)")
 print("\nTenant: garabato.localhost o 127.0.0.1")
 print("Backend URL: http://localhost:8000")
 print("=" * 50)

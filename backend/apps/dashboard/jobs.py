@@ -1,16 +1,14 @@
+"""
+Job de cálculo de métricas del dashboard. Función plana invocable desde el
+cron consolidado `daily_saas_run` o desde tests. No usa Celery.
+"""
 import logging
-
-from celery import shared_task
 
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name="dashboard.calculate_daily_metrics")
-def task_calculate_daily_metrics():
-    """
-    Calcula las métricas diarias del dashboard.
-    Ejecutar diariamente (ej: a las 6:00 AM).
-    """
+def run_daily_metrics_job():
+    """Calcula las métricas diarias del dashboard."""
     from apps.dashboard.services import calculate_daily_metrics
 
     try:

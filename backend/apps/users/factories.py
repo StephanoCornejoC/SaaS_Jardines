@@ -28,15 +28,3 @@ class SuperadminFactory(UserFactory):
     role = "SUPERADMIN"
     is_staff = True
     is_superuser = True
-
-
-class DirectorFactory(UserFactory):
-    role = "DIRECTOR"
-
-
-class SecretariaFactory(UserFactory):
-    role = "SECRETARIA"
-
-
-class ProfesorFactory(UserFactory):
-    role = "PROFESOR"

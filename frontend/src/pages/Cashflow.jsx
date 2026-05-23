@@ -356,7 +356,9 @@ export default function Cashflow() {
             <Select
               placeholder="Seleccione categoría"
               options={categories
-                .filter((c) => !tipoValue || c.tipo === tipoValue)
+                // Las categorías sin tipo (ej. "Otros") son bidireccionales:
+                // aparecen tanto al elegir INGRESO como EGRESO.
+                .filter((c) => !tipoValue || !c.tipo || c.tipo === tipoValue)
                 .map((c) => ({ value: c.id, label: c.nombre }))}
             />
           </Form.Item>

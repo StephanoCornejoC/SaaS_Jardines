@@ -1,164 +1,75 @@
 {% extends "admin/base.html" %}
-{% load static %}
+{% load i18n static %}
 
-{% block title %}{{ title }} | {{ site_title|default:"COREM Admin" }}{% endblock %}
-
-{% block extrastyle %}
-  {{ block.super }}
-  <link rel="stylesheet" href="{% static 'admin/css/corem.css' %}">
-{% endblock %}
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
 
 {% block branding %}
-  <div class="corem-branding-row">
-    <button type="button" class="corem-hamburger" id="corem-hamburger-btn"
-            aria-label="Abrir menú" aria-expanded="false">
-      <span></span><span></span><span></span>
-    </button>
-    <h1 id="site-name">
-      <a href="{% url 'admin:index' %}">{{ site_header|default:"COREM SaaS" }}</a>
-    </h1>
-  </div>
+{% comment %}
+  Branding fijo "Kiddo · Admin" en TODOS los modos. El nombre del jardín
+  activo se muestra solo en el banner teal (nav-global). Antes lo mostrábamos
+  acá también y se sentía redundante / pesado visualmente.
+
+  Hardcodeamos "/admin/" en lugar de `{% url 'admin:index' %}` porque en
+  modo tenant el reverse se mapea al current_app y rompe con NoReverseMatch.
+{% endcomment %}
+<h1 id="site-name">
+  <a href="/admin/" style="color:inherit">
+    {{ site_header|default:_('Kiddo · Admin') }}
+  </a>
+</h1>
 {% endblock %}
 
-{% block nav-global %}{% endblock %}
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  /* Banner del modo Operar jardín */
+  .tenant-banner {
+    background: linear-gradient(90deg, #0d9488 0%, #0f766e 100%);
+    color: #fff;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .tenant-banner .info { display: flex; align-items: center; gap: 8px; }
+  .tenant-banner .label {
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    font-size: 11px;
+    opacity: 0.85;
+    font-weight: 600;
+  }
+  .tenant-banner .nombre { font-weight: 700; font-size: 15px; }
+  .tenant-banner .meta { opacity: 0.85; font-size: 12px; }
+  .tenant-banner a.back {
+    background: rgba(255,255,255,0.18);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    font-weight: 600;
+    border: 1px solid rgba(255,255,255,0.25);
+  }
+  .tenant-banner a.back:hover {
+    background: rgba(255,255,255,0.28);
+    text-decoration: none;
+  }
+</style>
+{% endblock %}
 
-{# Drawer lateral con la navegación principal — se monta en TODAS las páginas del admin #}
-{% block footer %}
-  {{ block.super }}
-
-  <div class="corem-drawer-overlay" id="corem-drawer-overlay"></div>
-  <aside class="corem-drawer" id="corem-drawer" aria-hidden="true">
-    <div class="corem-drawer-head">
-      <span class="corem-drawer-logo">COREM SaaS</span>
-      <button type="button" class="corem-drawer-close" id="corem-drawer-close"
-              aria-label="Cerrar menú">×</button>
+{% block nav-global %}
+{% if active_tenant %}
+  <div class="tenant-banner">
+    <div class="info">
+      <span class="label">Operando jardín:</span>
+      <span class="nombre">{{ active_tenant.nombre }}</span>
+      <span class="meta">· schema <code style="background:rgba(0,0,0,0.18);padding:1px 6px;border-radius:3px">{{ active_tenant.schema_name }}</code></span>
     </div>
-
-    <nav class="corem-drawer-nav">
-      <div class="corem-drawer-section">
-        <div class="corem-drawer-label">Panel</div>
-        <a href="{% url 'admin:index' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">📊</span> Dashboard
-        </a>
-      </div>
-
-      <div class="corem-drawer-section">
-        <div class="corem-drawer-label">Jardines</div>
-        <a href="{% url 'admin:tenants_tenant_changelist' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">🏫</span> Lista de jardines
-        </a>
-        <a href="{% url 'admin:tenants_tenant_crear_jardin' %}" class="corem-drawer-item corem-drawer-item-action">
-          <span class="corem-drawer-icon">＋</span> Crear nuevo jardín
-        </a>
-        <a href="{% url 'admin:tenants_domain_changelist' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">🌐</span> Dominios
-        </a>
-      </div>
-
-      <div class="corem-drawer-section">
-        <div class="corem-drawer-label">Suscripciones y cobros</div>
-        <a href="{% url 'admin:platform_tenantsubscription_changelist' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">📑</span> Suscripciones
-        </a>
-        <a href="{% url 'admin:platform_platforminvoice_changelist' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">💵</span> Cobros mensuales
-        </a>
-        <a href="{% url 'admin:platform_platformcost_changelist' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">🧾</span> Gastos operativos
-        </a>
-        <a href="{% url 'admin:platform_plan_changelist' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">🏷</span> Planes
-        </a>
-      </div>
-
-      <div class="corem-drawer-section">
-        <div class="corem-drawer-label">Usuarios COREM</div>
-        <a href="{% url 'admin:users_user_changelist' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">👤</span> Usuarios
-        </a>
-        <a href="{% url 'admin:auth_group_changelist' %}" class="corem-drawer-item">
-          <span class="corem-drawer-icon">🛡</span> Grupos
-        </a>
-      </div>
-
-      <div class="corem-drawer-section">
-        <a href="{% url 'admin:logout' %}" class="corem-drawer-item corem-drawer-item-logout">
-          <span class="corem-drawer-icon">⏻</span> Cerrar sesión
-        </a>
-      </div>
-    </nav>
-  </aside>
-
-  <script>
-    (function() {
-      const btn = document.getElementById('corem-hamburger-btn');
-      const drawer = document.getElementById('corem-drawer');
-      const overlay = document.getElementById('corem-drawer-overlay');
-      const closeBtn = document.getElementById('corem-drawer-close');
-      const body = document.body;
-      const KEY = 'corem-drawer-collapsed';
-      const MQ_DESKTOP = window.matchMedia('(min-width: 1025px)');
-
-      function isDesktop() { return MQ_DESKTOP.matches; }
-
-      // Estado inicial: en desktop, abierto por defecto (a menos que el user lo haya plegado)
-      function applyInitial() {
-        if (isDesktop()) {
-          const wasCollapsed = localStorage.getItem(KEY) === '1';
-          if (wasCollapsed) {
-            body.classList.add('drawer-collapsed');
-          } else {
-            body.classList.remove('drawer-collapsed');
-          }
-          // En desktop el drawer siempre está "open" (es persistente)
-          drawer.classList.add('open');
-          overlay.classList.remove('open');
-          body.classList.remove('corem-drawer-locked');
-        } else {
-          // Mobile: drawer cerrado por defecto
-          drawer.classList.remove('open');
-          overlay.classList.remove('open');
-          body.classList.remove('corem-drawer-locked');
-        }
-      }
-
-      function toggleDesktop() {
-        const collapsed = body.classList.toggle('drawer-collapsed');
-        localStorage.setItem(KEY, collapsed ? '1' : '0');
-        btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-      }
-
-      function openMobile() {
-        drawer.classList.add('open');
-        overlay.classList.add('open');
-        body.classList.add('corem-drawer-locked');
-        btn.setAttribute('aria-expanded', 'true');
-        drawer.setAttribute('aria-hidden', 'false');
-      }
-      function closeMobile() {
-        drawer.classList.remove('open');
-        overlay.classList.remove('open');
-        body.classList.remove('corem-drawer-locked');
-        btn.setAttribute('aria-expanded', 'false');
-        drawer.setAttribute('aria-hidden', 'true');
-      }
-
-      btn && btn.addEventListener('click', () => {
-        if (isDesktop()) {
-          toggleDesktop();
-        } else {
-          drawer.classList.contains('open') ? closeMobile() : openMobile();
-        }
-      });
-      closeBtn && closeBtn.addEventListener('click', () => {
-        if (isDesktop()) toggleDesktop(); else closeMobile();
-      });
-      overlay && overlay.addEventListener('click', closeMobile);
-      document.addEventListener('keydown', e => {
-        if (e.key === 'Escape' && !isDesktop() && drawer.classList.contains('open')) closeMobile();
-      });
-      MQ_DESKTOP.addEventListener('change', applyInitial);
-      applyInitial();
-    })();
-  </script>
+    <a class="back" href="/admin/op/exit/">← Volver al panel de Kiddo</a>
+  </div>
+{% endif %}
+{{ block.super }}
 {% endblock %}

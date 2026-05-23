@@ -4,7 +4,7 @@ import pytest
 from unittest.mock import MagicMock
 
 from apps.users.factories import UserFactory
-from apps.users.permissions import IsAdminJardinOrAbove, IsDirectorOrAbove, IsSuperadmin
+from apps.users.permissions import IsAdminJardinOrAbove, IsSuperadmin
 
 pytestmark = [pytest.mark.django_db, pytest.mark.unit]
 
@@ -29,9 +29,10 @@ class TestIsSuperadmin:
         request = _make_request(user)
         assert self.perm.has_permission(request, None) is False
 
-    def test_denies_profesor(self, tenant):
-        user = UserFactory(role="PROFESOR")
-        request = _make_request(user)
+    def test_denies_unauthenticated(self, tenant):
+        request = MagicMock()
+        request.user = MagicMock()
+        request.user.is_authenticated = False
         assert self.perm.has_permission(request, None) is False
 
 
@@ -48,31 +49,8 @@ class TestIsAdminJardinOrAbove:
         request = _make_request(user)
         assert self.perm.has_permission(request, None) is True
 
-    def test_denies_director(self, tenant):
-        user = UserFactory(role="DIRECTOR")
-        request = _make_request(user)
-        assert self.perm.has_permission(request, None) is False
-
-    def test_denies_profesor(self, tenant):
-        user = UserFactory(role="PROFESOR")
-        request = _make_request(user)
-        assert self.perm.has_permission(request, None) is False
-
-
-class TestIsDirectorOrAbove:
-    perm = IsDirectorOrAbove()
-
-    def test_allows_director(self, tenant):
-        user = UserFactory(role="DIRECTOR")
-        request = _make_request(user)
-        assert self.perm.has_permission(request, None) is True
-
-    def test_allows_admin(self, tenant):
-        user = UserFactory(role="ADMIN_JARDIN")
-        request = _make_request(user)
-        assert self.perm.has_permission(request, None) is True
-
-    def test_denies_secretaria(self, tenant):
-        user = UserFactory(role="SECRETARIA")
-        request = _make_request(user)
+    def test_denies_unauthenticated(self, tenant):
+        request = MagicMock()
+        request.user = MagicMock()
+        request.user.is_authenticated = False
         assert self.perm.has_permission(request, None) is False

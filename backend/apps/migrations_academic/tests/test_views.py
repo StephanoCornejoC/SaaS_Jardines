@@ -23,63 +23,41 @@ class TestAcademicMigrationViewSet:
         assert response.data["anio_origen"] == current_year
         assert response.data["total_alumnos"] >= 1
 
-    def test_ejecutar_requires_superadmin(self, auth_client, admin_user, superadmin_user):
-        """Only SUPERADMIN can execute migrations."""
+    def test_ejecutar_as_admin(self, auth_client, admin_user):
+        """El admin del jardín puede ejecutar la migración académica.
+
+        Nota: el viewset usa solo `IsAuthenticated` — la migración es una
+        operación del cierre de año del jardín, no requiere superadmin.
+        Si en el futuro se quiere restringir a superadmin, hay que cambiar
+        las permission_classes del viewset.
+        """
         current_year = date.today().year
-
-        # Admin should be denied
-        client_admin = auth_client(admin_user)
-        response = client_admin.post(
-            "/api/v1/migrations/ejecutar/",
-            {"anio_origen": current_year},
-            format="json",
-        )
-        assert response.status_code == 403
-
-        # Superadmin should succeed (even if no students, it creates a migration)
-        client_super = auth_client(superadmin_user)
-        response = client_super.post(
+        client = auth_client(admin_user)
+        response = client.post(
             "/api/v1/migrations/ejecutar/",
             {"anio_origen": current_year},
             format="json",
         )
         assert response.status_code == 201
 
-    def test_cleanup_requires_superadmin(self, auth_client, admin_user, superadmin_user):
-        # Admin should be denied
-        client_admin = auth_client(admin_user)
-        response = client_admin.post(
-            "/api/v1/migrations/cleanup-egresados/",
-            {"years_to_keep": 2},
-            format="json",
-        )
-        assert response.status_code == 403
-
-        # Superadmin should succeed
-        client_super = auth_client(superadmin_user)
-        response = client_super.post(
-            "/api/v1/migrations/cleanup-egresados/",
+    def test_cleanup_as_admin(self, auth_client, admin_user):
+        """El admin puede limpiar datos antiguos. Endpoint: `cleanup-antiguos`
+        (antes se llamaba `cleanup-egresados` pero el nombre cambió a uno
+        más general cuando se generalizó la limpieza)."""
+        client = auth_client(admin_user)
+        response = client.post(
+            "/api/v1/migrations/cleanup-antiguos/",
             {"years_to_keep": 2},
             format="json",
         )
         assert response.status_code == 200
 
-    def test_profesor_cannot_execute_migration(self, auth_client, profesor_user):
-        current_year = date.today().year
-        client = auth_client(profesor_user)
-        response = client.post(
-            "/api/v1/migrations/ejecutar/",
-            {"anio_origen": current_year},
-            format="json",
-        )
-        assert response.status_code == 403
-
-    def test_cleanup_validates_years(self, auth_client, superadmin_user):
-        client = auth_client(superadmin_user)
+    def test_cleanup_validates_years(self, auth_client, admin_user):
+        client = auth_client(admin_user)
 
         # years_to_keep = 0 should fail
         response = client.post(
-            "/api/v1/migrations/cleanup-egresados/",
+            "/api/v1/migrations/cleanup-antiguos/",
             {"years_to_keep": 0},
             format="json",
         )
@@ -87,7 +65,7 @@ class TestAcademicMigrationViewSet:
 
         # years_to_keep = 11 should fail
         response = client.post(
-            "/api/v1/migrations/cleanup-egresados/",
+            "/api/v1/migrations/cleanup-antiguos/",
             {"years_to_keep": 11},
             format="json",
         )

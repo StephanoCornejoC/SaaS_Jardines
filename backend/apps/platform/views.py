@@ -13,3 +13,5 @@ def admin_dashboard(request):
     data["series_json"] = json.dumps(data["series"])
     data["distribucion_json"] = json.dumps(data["distribucion"])
     return render(request, "admin/platform/dashboard.html", data)
+
+

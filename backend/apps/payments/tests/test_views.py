@@ -7,7 +7,7 @@ from decimal import Decimal
 from apps.payments.factories import MonthlyFeeFactory, PaymentFactory
 from apps.payments.models import Payment
 from apps.students.factories import StudentFactory
-from apps.users.factories import ProfesorFactory, UserFactory
+from apps.users.factories import UserFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.unit]
 
@@ -51,30 +51,22 @@ class TestPaymentViewSet:
         assert tx.exists()
         assert tx.first().tipo == "INGRESO"
 
-    def test_registrar_pago_requires_admin(self, auth_client, profesor_user):
-        payment = PaymentFactory(estado="PENDIENTE")
-        client = auth_client(profesor_user)
-        response = client.patch(
-            f"/api/v1/payments/{payment.pk}/registrar-pago/",
-            {"estado": "PAGADO"},
-            format="json",
-        )
-        assert response.status_code == 403
-
     def test_morosidad_report(self, auth_client, admin_user):
         current_year = date.today().year
-        # Create an overdue payment
+        # El reporte de morosidad solo cuenta meses lectivos en Perú: marzo
+        # a diciembre (enero y febrero son vacaciones, no se cobran).
+        # Usamos mes=4 (Abril) para que entre en el filtro del endpoint.
         PaymentFactory(
             estado="PENDIENTE",
             anio=current_year,
-            mes=1,
+            mes=4,
             fecha_vencimiento=date.today() - timedelta(days=30),
         )
         # Create a paid payment -- should not appear
         PaymentFactory(
             estado="PAGADO",
             anio=current_year,
-            mes=1,
+            mes=4,
             fecha_vencimiento=date.today() - timedelta(days=30),
         )
 
@@ -82,13 +74,6 @@ class TestPaymentViewSet:
         response = client.get(f"/api/v1/payments/morosidad/?anio={current_year}")
         assert response.status_code == 200
         assert response.data["total_morosos"] >= 1
-
-    def test_payment_profesor_readonly(self, auth_client, profesor_user):
-        """Profesor can list but not create payments."""
-        client = auth_client(profesor_user)
-        response = client.get("/api/v1/payments/")
-        assert response.status_code == 200
-
 
 class TestPaymentParamValidation:
     """Tests for input validation on morosidad query params."""
@@ -130,13 +115,3 @@ class TestMonthlyFeeViewSet:
         assert response.status_code == 200
         assert response.data["monto_mensual"] == "400.00"
 
-    def test_generar_qr(self, auth_client, admin_user):
-        """El endpoint QR ahora retorna HTTP 200 con image/png directamente."""
-        payment = PaymentFactory()
-        client = auth_client(admin_user)
-        response = client.get(
-            f"/api/v1/payments/{payment.pk}/generar-qr/",
-        )
-        assert response.status_code == 200
-        assert response["Content-Type"].startswith("image/png")
-        assert len(response.content) > 100  # PNG válido no vacío

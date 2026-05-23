@@ -1,40 +1,8 @@
-import io
 from datetime import date
-
-import qrcode
 
 from apps.students.models import Student
 
 from .models import MonthlyFee, Payment
-
-
-def generate_yape_qr(student, payment):
-    """
-    Genera un codigo QR con la informacion del pago para Yape/Plin.
-    Retorna los bytes PNG directamente (sin guardar en filesystem).
-    """
-    qr_text = (
-        f"Pension {student.nombres} {student.apellidos} "
-        f"- {payment.mes}/{payment.anio} "
-        f"- S/{payment.monto}"
-    )
-
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(qr_text)
-    qr.make(fit=True)
-
-    img = qr.make_image(fill_color="black", back_color="white")
-
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-
-    return buffer.getvalue()
 
 
 def generate_monthly_payments(anio_escolar, mes):

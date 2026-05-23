@@ -21,14 +21,11 @@
     .alert-box { background:#fef2f2; border:1px solid #fecaca; color:#991b1b; padding:12px 14px; border-radius:8px; margin-bottom:18px; }
     .actions { margin-bottom:16px; }
     .actions a { display:inline-block; padding:6px 12px; background:#0d9488; color:#fff; border-radius:6px; text-decoration:none; font-size:12px; margin-right:8px; }
-    /* Wrappers de altura fija para los canvas de Chart.js (evita crecimiento infinito) */
-    .chart-wrap { position: relative; height: 280px; width: 100%; }
-    .chart-wrap canvas { max-width: 100% !important; }
   </style>
 {% endblock %}
 
 {% block content %}
-  <h1 style="font-size:24px;font-weight:700;margin-bottom:18px;color:#0f172a;">Dashboard</h1>
+  <h1 style="font-size:22px;margin-bottom:18px;">Panel COREM</h1>
 
   {% if morosos_total %}
     <div class="alert-box">
@@ -36,6 +33,13 @@
       Revisa la sección "Cobros mensuales" o la tabla más abajo.
     </div>
   {% endif %}
+
+  <div class="actions">
+    <a href="{% url 'admin:tenants_tenant_crear_jardin' %}">+ Crear nuevo jardín</a>
+    <a href="{% url 'admin:tenants_tenant_changelist' %}">Lista de jardines</a>
+    <a href="{% url 'admin:platform_platforminvoice_changelist' %}">Cobros mensuales</a>
+    <a href="{% url 'admin:platform_platformcost_changelist' %}">Gastos operativos</a>
+  </div>
 
   <div class="corem-grid">
     <div class="kpi-card">
@@ -80,15 +84,11 @@
   <div class="corem-row">
     <div class="corem-section">
       <h2>Ingresos vs Costos (12 meses)</h2>
-      <div class="chart-wrap">
-        <canvas id="chart-trend"></canvas>
-      </div>
+      <canvas id="chart-trend" height="120"></canvas>
     </div>
     <div class="corem-section">
       <h2>Distribución de jardines por estado</h2>
-      <div class="chart-wrap">
-        <canvas id="chart-dist"></canvas>
-      </div>
+      <canvas id="chart-dist" height="120"></canvas>
     </div>
   </div>
 

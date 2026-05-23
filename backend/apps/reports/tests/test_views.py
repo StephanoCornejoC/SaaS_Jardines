@@ -43,22 +43,17 @@ class TestReportViewSet:
             in response["Content-Type"]
         )
 
-    def test_profesor_cannot_download_reports(self, auth_client, profesor_user):
-        """Profesor does not have IsAdminJardinOrAbove permission."""
-        client = auth_client(profesor_user)
-        response = client.get("/api/v1/reports/morosidad-excel/")
-        assert response.status_code == 403
-
     def test_excel_contains_correct_data(self, auth_client, admin_user):
         """Verify the response is non-empty Excel data."""
-        current_year = date.today().year
-        student = StudentFactory(estado="ACTIVO", nombres="Pepito", apellidos="Flores")
+        StudentFactory(estado="ACTIVO", nombres="Pepito", apellidos="Flores")
 
         client = auth_client(admin_user)
         response = client.get("/api/v1/reports/alumnos-excel/?estado=ACTIVO")
         assert response.status_code == 200
-        # Check the response content is non-empty (binary XLSX)
-        assert len(response.content) > 100  # minimal XLSX size
+        # El endpoint devuelve FileResponse que usa streaming_content
+        # (no .content), porque sirve el archivo desde un SpooledTemporaryFile.
+        body = b"".join(response.streaming_content)
+        assert len(body) > 100  # minimal XLSX size
 
 
 class TestReportParamValidation:

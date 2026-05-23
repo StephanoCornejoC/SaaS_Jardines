@@ -22,6 +22,11 @@ DATABASES = {
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+        # client_encoding fuerza UTF-8 en la conexión. Sin esto, en máquinas
+        # con locale es_PE / es_ES el server Postgres puede mandar mensajes
+        # en español (latin-1) en el handshake y psycopg2 rompe con
+        # `UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf3`.
+        "OPTIONS": {"client_encoding": "UTF8"},
         "TEST": {"NAME": "test_saas_corem"},
     }
 }

@@ -48,23 +48,22 @@ class TestStudentViewSet:
             "estado": "ACTIVO",
             "fecha_ingreso": str(date.today()),
             "classroom": classroom.pk,
+            # El serializer requiere al menos 1 apoderado al crear un alumno
+            # nuevo (regla de negocio del SaaS — toda matrícula necesita un
+            # responsable contactable).
+            "apoderados": [
+                {
+                    "dni": "11223344",
+                    "nombres": "Apoderado",
+                    "apellidos": "Test",
+                    "telefono": "999000111",
+                    "parentesco": "MADRE",
+                    "es_principal": True,
+                }
+            ],
         }
         response = client.post("/api/v1/students/", data, format="json")
-        assert response.status_code == 201
-
-    def test_create_student_as_profesor_forbidden(self, auth_client, profesor_user):
-        client = auth_client(profesor_user)
-        data = {
-            "dni": "11223344",
-            "nombres": "Forbidden",
-            "apellidos": "Student",
-            "fecha_nacimiento": "2021-01-01",
-            "genero": "M",
-            "estado": "ACTIVO",
-            "fecha_ingreso": str(date.today()),
-        }
-        response = client.post("/api/v1/students/", data, format="json")
-        assert response.status_code == 403
+        assert response.status_code == 201, response.data
 
     def test_student_detail_includes_apoderados(self, auth_client, admin_user):
         student = StudentFactory()

@@ -18,6 +18,9 @@ DATABASES = {
         "PASSWORD": os.environ.get("PGPASSWORD"),
         "HOST": os.environ.get("PGHOST"),
         "PORT": os.environ.get("PGPORT", "5432"),
+        # Reutilizar conexiones por 60s. Reduce ~30% del overhead de
+        # handshake TCP por request en Railway.
+        "CONN_MAX_AGE": 60,
     }
 }
 
@@ -25,15 +28,17 @@ DATABASES = {
 CORS_ALLOWED_ORIGINS = [o for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o]
 CORS_ALLOW_CREDENTIALS = True
 
-# Celery
-CELERY_BROKER_URL = os.environ.get("REDIS_URL")
-CELERY_RESULT_BACKEND = CELERY_BROKER_URL
-
-# Cache
+# Cache compartido entre workers de gunicorn vía Postgres.
+# Antes usábamos Redis, pero al consolidar los crons en `daily_saas_run`
+# Redis dejó de tener uso. DatabaseCache nos da un store compartido sin
+# pagar un servicio adicional.
+# Requisito de deploy: `python manage.py createcachetable` (idempotente).
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.redis.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL"),
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "corem_cache",
+        "TIMEOUT": 300,
+        "OPTIONS": {"MAX_ENTRIES": 5000},
     }
 }
 

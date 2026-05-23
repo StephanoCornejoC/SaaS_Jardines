@@ -1,32 +1,66 @@
 """Middleware que bloquea el acceso a un tenant con suscripción suspendida."""
 
+import logging
+
+from django.core.cache import cache
 from django.db import connection
 from django.http import JsonResponse
 
+logger = logging.getLogger(__name__)
+
+# Cache TTL para el estado de bloqueo del tenant. Sacrificamos hasta 60s de
+# latencia en propagar un cambio de estado a cambio de eliminar 1 query DB
+# por cada request. La invalidación inmediata se hace con un signal
+# post_save/post_delete en TenantSubscription (ver signals.py).
+_BLOCKED_CACHE_TTL = 60
+
+
+def _cache_key(schema_name):
+    return f"tenant:blocked:{schema_name}"
+
 
 def _is_blocked():
-    """Devuelve True si el tenant actual está BLOQUEADO."""
+    """Devuelve True si el tenant actual está BLOQUEADO. Cacheado 60s."""
     if not getattr(connection, "tenant", None):
         return False
     schema = connection.schema_name
     if schema in ("public", "info"):
         return False
-    # Import diferido para evitar problemas de carga
-    from apps.platform.models import TenantSubscription
 
-    return TenantSubscription.objects.filter(
-        tenant__schema_name=schema,
-        estado=TenantSubscription.Estado.BLOQUEADA,
-    ).exists()
+    key = _cache_key(schema)
+    cached = cache.get(key)
+    if cached is not None:
+        return cached
+
+    try:
+        from apps.platform.models import TenantSubscription
+
+        is_blocked = TenantSubscription.objects.filter(
+            tenant__schema_name=schema,
+            estado=TenantSubscription.Estado.BLOQUEADA,
+        ).exists()
+    except Exception as e:
+        # Fail-open: si la DB está caída no convertimos cada request en 402.
+        logger.warning(f"BlockSuspendedTenantMiddleware: error consultando estado ({e}); fail-open")
+        return False
+
+    cache.set(key, is_blocked, _BLOCKED_CACHE_TTL)
+    return is_blocked
 
 
-# Endpoints permitidos siempre (admin del superadmin, login/refresh, estáticos).
+def invalidate_blocked_cache(schema_name):
+    """Invalidación explícita. La usa el signal post_save de TenantSubscription."""
+    cache.delete(_cache_key(schema_name))
+
+
+# Endpoints permitidos siempre (login/refresh para que el SUPERADMIN
+# pueda entrar y desbloquear, y healthcheck).
 _BYPASS_PREFIXES = (
-    "/admin/",          # admin Django — superadmin y jardín
-    "/api/v1/auth/",    # login / refresh JWT
+    "/admin/",                      # COREM Labs Admin (SuperAdmin Hub)
+    "/api/v1/auth/",                # login/refresh
     "/static/",
     "/media/",
-    "/health/",
+    "/health/",                     # Railway healthcheck
 )
 
 

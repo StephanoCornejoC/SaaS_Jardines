@@ -23,21 +23,17 @@ class UserCreateSerializer(serializers.ModelSerializer):
         fields = ("email", "password", "first_name", "last_name", "role", "telefono")
 
     def validate_role(self, value):
+        """Impide escalación de privilegios: un ADMIN_JARDIN no puede
+        crear un SUPERADMIN. La única jerarquía vigente del SaaS es
+        SUPERADMIN > ADMIN_JARDIN (ver users.models.Role)."""
         request = self.context.get("request")
         if request and request.user:
             user_role = request.user.role
-            role_hierarchy = [
-                "PROFESOR",
-                "SECRETARIA",
-                "DIRECTOR",
-                "ADMIN_JARDIN",
-                "SUPERADMIN",
-            ]
-            if user_role in role_hierarchy and value in role_hierarchy:
-                if role_hierarchy.index(value) > role_hierarchy.index(user_role):
-                    raise serializers.ValidationError(
-                        "No puede asignar un rol superior al suyo."
-                    )
+            # Solo SUPERADMIN puede crear SUPERADMIN.
+            if value == "SUPERADMIN" and user_role != "SUPERADMIN":
+                raise serializers.ValidationError(
+                    "No puede asignar un rol superior al suyo."
+                )
         return value
 
     def create(self, validated_data):

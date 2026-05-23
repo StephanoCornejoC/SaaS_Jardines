@@ -4,6 +4,10 @@ from django.db import models
 
 
 class Teacher(models.Model):
+    class Tipo(models.TextChoices):
+        TITULAR = "TITULAR", "Titular"
+        AUXILIAR = "AUXILIAR", "Auxiliar"
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -15,6 +19,17 @@ class Teacher(models.Model):
     dni = models.CharField(max_length=8, unique=True, verbose_name="DNI")
     nombres = models.CharField(max_length=150)
     apellidos = models.CharField(max_length=150)
+    tipo = models.CharField(
+        max_length=10,
+        choices=Tipo.choices,
+        default=Tipo.TITULAR,
+        verbose_name="Tipo de profesor",
+        help_text=(
+            "Titular: a cargo del aula. Auxiliar: apoya al titular. "
+            "Solo los Titulares pueden asignarse como profesor_titular "
+            "del aula; solo los Auxiliares como profesor_auxiliar."
+        ),
+    )
     especialidad = models.CharField(max_length=200, blank=True)
     telefono = models.CharField(max_length=20)
     email = models.EmailField(null=True, blank=True)
@@ -29,6 +44,10 @@ class Teacher(models.Model):
 
     def __str__(self):
         return f"{self.apellidos}, {self.nombres}"
+
+    @property
+    def nombre_completo(self):
+        return f"{self.nombres} {self.apellidos}".strip()
 
 
 class TeacherContract(models.Model):
@@ -95,8 +114,8 @@ class TeacherPayment(models.Model):
     class Meta:
         unique_together = ("contract", "mes", "anio")
         ordering = ["-anio", "-mes"]
-        verbose_name = "Pago"
-        verbose_name_plural = "Pagos"
+        verbose_name = "Sueldo pagado"
+        verbose_name_plural = "Sueldos"
 
     def __str__(self):
         return f"Pago {self.mes}/{self.anio} - {self.contract.teacher}"

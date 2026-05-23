@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: saas_corem_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: saas_corem_dev
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: PostgresDev123!
+    ports:
+      - "5433:5432"
+    volumes:
+      - corem_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d saas_corem_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  corem_pgdata:
+    name: corem_pgdata

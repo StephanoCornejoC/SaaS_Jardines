@@ -12,6 +12,7 @@ const Teachers = lazy(() => import("./pages/Teachers"));
 const Classrooms = lazy(() => import("./pages/Classrooms"));
 const Enrollments = lazy(() => import("./pages/Enrollments"));
 const Payments = lazy(() => import("./pages/Payments"));
+const Sueldos = lazy(() => import("./pages/Sueldos"));
 const Cashflow = lazy(() => import("./pages/Cashflow"));
 const Attendance = lazy(() => import("./pages/Attendance"));
 const Communications = lazy(() => import("./pages/Communications"));
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="aulas" element={<Classrooms />} />
           <Route path="matriculas" element={<Enrollments />} />
           <Route path="pensiones" element={<Payments />} />
+          <Route path="sueldos" element={<Sueldos />} />
           <Route path="caja" element={<Cashflow />} />
           <Route path="asistencia" element={<Attendance />} />
           <Route path="comunicaciones" element={<Communications />} />

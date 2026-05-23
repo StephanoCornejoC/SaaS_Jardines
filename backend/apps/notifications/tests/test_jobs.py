@@ -1,4 +1,4 @@
-"""Tests for notification Celery tasks."""
+"""Tests for notification jobs (plain functions, no Celery)."""
 
 import pytest
 from datetime import date, timedelta
@@ -6,22 +6,22 @@ from unittest.mock import patch
 
 from apps.attendance.factories import AttendanceFactory
 from apps.students.factories import StudentFactory
-from apps.notifications.tasks import task_check_attendance_alerts
+from apps.notifications.jobs import run_attendance_alerts_job
 
 pytestmark = [pytest.mark.django_db, pytest.mark.unit]
 
 
-class TestCheckAttendanceAlerts:
+class TestRunAttendanceAlertsJob:
     def test_no_students(self, tenant):
         """No active students => no alerts sent."""
-        result = task_check_attendance_alerts()
+        result = run_attendance_alerts_job()
         assert result["enviados"] == 0
         assert result["errores"] == 0
 
     def test_student_without_attendance(self, tenant):
         """Student with no attendance records => no alert."""
         StudentFactory(estado="ACTIVO")
-        result = task_check_attendance_alerts()
+        result = run_attendance_alerts_job()
         assert result["enviados"] == 0
 
     def test_student_with_normal_attendance(self, tenant):
@@ -33,7 +33,7 @@ class TestCheckAttendanceAlerts:
                 fecha=date.today() - timedelta(days=i),
                 estado="PRESENTE",
             )
-        result = task_check_attendance_alerts()
+        result = run_attendance_alerts_job()
         assert result["enviados"] == 0
 
     @patch("apps.notifications.services.send_attendance_alert")
@@ -48,7 +48,7 @@ class TestCheckAttendanceAlerts:
                 fecha=date.today() - timedelta(days=i),
                 estado="AUSENTE",
             )
-        result = task_check_attendance_alerts()
+        result = run_attendance_alerts_job()
         assert result["enviados"] == 1
         mock_send.assert_called_once()
 
@@ -58,7 +58,7 @@ class TestCheckAttendanceAlerts:
         AttendanceFactory(student=student, fecha=date.today(), estado="AUSENTE")
         AttendanceFactory(student=student, fecha=date.today() - timedelta(days=1), estado="PRESENTE")
         AttendanceFactory(student=student, fecha=date.today() - timedelta(days=2), estado="AUSENTE")
-        result = task_check_attendance_alerts()
+        result = run_attendance_alerts_job()
         assert result["enviados"] == 0
 
     def test_inactive_student_ignored(self, tenant):
@@ -70,5 +70,5 @@ class TestCheckAttendanceAlerts:
                 fecha=date.today() - timedelta(days=i),
                 estado="AUSENTE",
             )
-        result = task_check_attendance_alerts()
+        result = run_attendance_alerts_job()
         assert result["enviados"] == 0

@@ -24,8 +24,14 @@ class TestCommunicationViewSet:
         assert response.data["enviado_por"] == admin_user.pk
 
     @patch("apps.communications.views.send_mail")
-    def test_enviar_sends_emails(self, mock_send_mail, auth_client, admin_user):
-        # Create student with guardian who has email
+    def test_enviar_queues_emails(self, mock_send_mail, auth_client, admin_user):
+        """El endpoint /enviar/ encola el envío en background (threading) y
+        responde 202 Accepted con un mensaje + total_emails + estado.
+
+        NO verificamos el side-effect del send_mail (el thread es async y
+        no es determinístico en tests). Para verificación end-to-end del
+        envío, los tests de integración E2E con SMTP real.
+        """
         student = StudentFactory(estado="ACTIVO")
         GuardianFactory(student=student, es_principal=True, email="parent@test.com")
 
@@ -36,44 +42,27 @@ class TestCommunicationViewSet:
             enviado_por=admin_user,
         )
 
-        mock_send_mail.return_value = 1
-
         client = auth_client(admin_user)
         response = client.post(
             f"/api/v1/communications/{comm.pk}/enviar/",
             format="json",
         )
-        assert response.status_code == 200
-        assert response.data["enviados"] >= 1
+        assert response.status_code == 202, response.data
+        assert "mensaje" in response.data
+        assert response.data["total_emails"] >= 1
+        assert response.data["estado"] == "encolado"
 
-        comm.refresh_from_db()
-        assert comm.enviado is True
-        assert comm.fecha_envio is not None
-
-    def test_enviar_requires_admin(self, auth_client, profesor_user):
-        comm = Communication.objects.create(
-            titulo="Test",
-            contenido="Content",
-            tipo="GENERAL",
-        )
-        client = auth_client(profesor_user)
-        response = client.post(
-            f"/api/v1/communications/{comm.pk}/enviar/",
-            format="json",
-        )
-        assert response.status_code == 403
-
-    @patch("apps.communications.views.send_mail", side_effect=Exception("SMTP error"))
-    def test_partial_failure_not_marked_sent(self, mock_send_mail, auth_client, admin_user):
-        """If all emails fail, the communication is NOT marked as sent."""
+    def test_enviar_rejects_already_sent(self, auth_client, admin_user):
+        """No se puede re-enviar una comunicación ya enviada."""
         student = StudentFactory(estado="ACTIVO")
-        GuardianFactory(student=student, es_principal=True, email="fail@test.com")
+        GuardianFactory(student=student, es_principal=True, email="parent@test.com")
 
         comm = Communication.objects.create(
-            titulo="Aviso Fallido",
-            contenido="Este va a fallar",
+            titulo="Ya enviada",
+            contenido="Contenido",
             tipo="GENERAL",
             enviado_por=admin_user,
+            enviado=True,
         )
 
         client = auth_client(admin_user)
@@ -81,9 +70,5 @@ class TestCommunicationViewSet:
             f"/api/v1/communications/{comm.pk}/enviar/",
             format="json",
         )
-        assert response.status_code == 200
-        assert response.data["enviados"] == 0
-        assert len(response.data["errores"]) >= 1
-
-        comm.refresh_from_db()
-        assert comm.enviado is False
+        assert response.status_code == 400
+        assert "ya fue enviada" in response.data["error"]

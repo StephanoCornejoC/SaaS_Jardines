@@ -1,4 +1,3 @@
-from calendar import monthrange
 from datetime import date, timedelta
 from decimal import Decimal
 
@@ -7,8 +6,8 @@ from django.db import models
 
 
 class Plan(models.Model):
-    """Plan del SaaS. Hay un plan principal vigente y se pueden crear planes
-    promocionales / de campaña en paralelo."""
+    """Único plan del SaaS. Se mantiene como modelo para tener histórico
+    de cambios de precio. Solo debería existir 1 fila marcada como activa."""
 
     nombre = models.CharField(max_length=80, default="Plan COREM")
     precio_mensual = models.DecimalField(
@@ -17,48 +16,31 @@ class Plan(models.Model):
         default=Decimal("120.00"),
         help_text="Precio mensual por jardín en soles",
     )
-    es_promocional = models.BooleanField(
-        default=False,
-        verbose_name="Promocional / campaña",
-        help_text="Marca si es un plan promocional o de campaña (no el plan principal)",
-    )
-    descripcion = models.CharField(
-        max_length=240,
-        blank=True,
-        help_text="Descripción visible (ej: '2x1 mes de aniversario', 'Verano 2026', etc.)",
-    )
     activo = models.BooleanField(default=True)
     creado_at = models.DateTimeField(auto_now_add=True)
     actualizado_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Plan"
-        verbose_name_plural = "Planes"
-        ordering = ("es_promocional", "-activo", "-creado_at")
+        verbose_name_plural = "Plan / Configuración"
+        ordering = ("-activo", "-creado_at")
 
     def __str__(self):
-        if self.es_promocional:
-            return f"{self.nombre} (promo · S/ {self.precio_mensual})"
         return f"{self.nombre} (S/ {self.precio_mensual}/mes)"
 
     @classmethod
     def vigente(cls):
-        """Plan principal vigente (no promocional)."""
-        return (
-            cls.objects.filter(activo=True, es_promocional=False)
-            .order_by("-creado_at")
-            .first()
-        )
+        return cls.objects.filter(activo=True).order_by("-creado_at").first()
 
 
 class TenantSubscription(models.Model):
     """Suscripción de un jardín al SaaS."""
 
     class Estado(models.TextChoices):
-        TRIAL = "TRIAL", "Prueba"
+        TRIAL = "TRIAL", "En periodo de prueba"
         ACTIVA = "ACTIVA", "Activa"
-        MOROSA = "MOROSA", "Mora"
-        BLOQUEADA = "BLOQUEADA", "Bloqueada"
+        MOROSA = "MOROSA", "En mora (3-7 días)"
+        BLOQUEADA = "BLOQUEADA", "Bloqueada por impago"
         CANCELADA = "CANCELADA", "Cancelada"
 
     tenant = models.OneToOneField(
@@ -77,21 +59,11 @@ class TenantSubscription(models.Model):
         decimal_places=2,
         help_text="Precio negociado para este jardín. Default = precio del plan.",
     )
-    fecha_alta = models.DateField(
-        default=date.today,
-        verbose_name="Fecha de alta",
-        help_text="Fecha en que el jardín fue dado de alta en COREM (inicio del periodo de prueba).",
-    )
+    fecha_alta = models.DateField(default=date.today)
     trial_hasta = models.DateField(
         null=True,
         blank=True,
-        verbose_name="Trial hasta",
-        help_text="Hasta esta fecha el jardín no se cobra. Default: alta + 30 días.",
-    )
-    dia_cobro = models.PositiveSmallIntegerField(
-        default=1,
-        verbose_name="Día de cobro",
-        help_text="Día del mes en que se emite el cobro (1-28).",
+        help_text="Hasta esta fecha el jardín no se cobra. Default: alta + 1 mes.",
     )
     estado = models.CharField(
         max_length=10, choices=Estado.choices, default=Estado.TRIAL
@@ -112,36 +84,11 @@ class TenantSubscription(models.Model):
     def en_trial(self):
         return self.trial_hasta and date.today() <= self.trial_hasta
 
-    @property
-    def proximo_cobro(self):
-        """Fecha estimada del próximo cobro mensual.
-        - Si aún está en trial: el día siguiente al fin del trial.
-        - Si ya pasó el trial: el próximo `dia_cobro` del calendario.
-        """
-        hoy = date.today()
-        # Aún en trial
-        if self.trial_hasta and hoy <= self.trial_hasta:
-            return self.trial_hasta + timedelta(days=1)
-        # Pasado el trial: buscar el siguiente día de cobro
-        dia = max(1, min(28, self.dia_cobro or 1))
-        candidato = date(hoy.year, hoy.month, dia)
-        if candidato <= hoy:
-            mes = hoy.month + 1
-            anio = hoy.year
-            if mes > 12:
-                mes = 1
-                anio += 1
-            candidato = date(anio, mes, dia)
-        return candidato
-
     def save(self, *args, **kwargs):
         if not self.trial_hasta:
             self.trial_hasta = self.fecha_alta + timedelta(days=30)
         if not self.precio_acordado and self.plan_id:
             self.precio_acordado = self.plan.precio_mensual
-        # Clamp dia_cobro a 1-28 (evitamos meses cortos)
-        if self.dia_cobro:
-            self.dia_cobro = max(1, min(28, int(self.dia_cobro)))
         super().save(*args, **kwargs)
 
 
@@ -219,14 +166,18 @@ class PlatformCost(models.Model):
         null=True,
         blank=True,
         related_name="costs",
-        help_text="Si el gasto aplica a un jardín específico",
+        help_text=(
+            "Si el gasto aplica a un jardín específico, asignarlo. "
+            "Si es un gasto genérico del SaaS (Railway, dominio, etc.), "
+            "dejarlo vacío."
+        ),
     )
     notas = models.TextField(blank=True)
     creado_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Gasto operativo"
-        verbose_name_plural = "Gastos operativos"
+        verbose_name = "Costo del SaaS"
+        verbose_name_plural = "Costos del SaaS"
         ordering = ("-fecha",)
 
     def __str__(self):

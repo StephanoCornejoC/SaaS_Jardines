@@ -4,7 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 
-from apps.users.factories import ProfesorFactory, UserFactory
+from apps.users.factories import UserFactory
 
 User = get_user_model()
 
@@ -73,14 +73,6 @@ class TestUserViewSet:
         # Admin sees all users (admin + 2 extras = 3)
         assert response.data["count"] >= 3
 
-    def test_list_users_as_profesor_sees_only_self(self, auth_client, profesor_user):
-        UserFactory()  # another user
-        client = auth_client(profesor_user)
-        response = client.get("/api/v1/auth/users/")
-        assert response.status_code == 200
-        assert response.data["count"] == 1
-        assert response.data["results"][0]["email"] == profesor_user.email
-
     def test_create_user_as_admin(self, auth_client, admin_user):
         client = auth_client(admin_user)
         data = {
@@ -88,23 +80,11 @@ class TestUserViewSet:
             "password": "StrongPass1234",
             "first_name": "Created",
             "last_name": "User",
-            "role": "PROFESOR",
+            "role": "ADMIN_JARDIN",
         }
         response = client.post("/api/v1/auth/users/", data, format="json")
         assert response.status_code == 201
         assert User.objects.filter(email="created@test.com").exists()
-
-    def test_create_user_as_profesor_forbidden(self, auth_client, profesor_user):
-        client = auth_client(profesor_user)
-        data = {
-            "email": "forbidden@test.com",
-            "password": "StrongPass1234",
-            "first_name": "Forbidden",
-            "last_name": "User",
-            "role": "PROFESOR",
-        }
-        response = client.post("/api/v1/auth/users/", data, format="json")
-        assert response.status_code == 403
 
     def test_update_user(self, auth_client, admin_user):
         target = UserFactory()

@@ -93,6 +93,9 @@ MIDDLEWARE = [
     "auditlog.middleware.AuditlogMiddleware",
     "axes.middleware.AxesMiddleware",
     "apps.platform.middleware.BlockSuspendedTenantMiddleware",
+    # Detecta /admin/jardin/<schema>/... y activa schema_context para que
+    # el TenantOpAdminSite opere en el schema correcto.
+    "config.middleware.TenantAdminMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -191,7 +194,9 @@ AUDITLOG_INCLUDE_TRACKING_MODELS = (
     # operar en schema público (auditlog explora relaciones inversas).
 )
 
-# --- Cache (memoria local en dev, configurar Redis en prod) ---
+# --- Cache ---
+# Default seguro para cualquier entorno (locmem). Sobreescrito en dev.py
+# (locmem) y prod.py (DatabaseCache compartido entre workers).
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -209,6 +214,8 @@ USE_TZ = True
 # --- Static & Media ---
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Sin esto, Django no encuentra `backend/static/admin/css/corem.css` y
+# devuelve 404, rompiendo el branding del admin del SuperAdmin.
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STORAGES = {
     "default": {
@@ -230,115 +237,32 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # --- Email ---
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@corem.pe")
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "noreply@miniddo.com")
 
-# --- Branding admin nativo (sustituye los settings de jazzmin) ---
-# Usamos admin.site.site_title/site_header en config/urls.py, ver tienda.
-# Aquí dejamos JAZZMIN_SETTINGS solo como referencia inactiva.
-_JAZZMIN_SETTINGS_LEGACY = {
-    "site_title": "COREM Admin",
-    "site_header": "COREM SaaS",
-    "site_brand": "COREM",
-    "site_logo": None,
-    "site_logo_classes": "img-circle",
-    "welcome_sign": "Panel de administración del jardín",
-    "copyright": "COREM Labs S.A.C.",
-    "search_model": ["students.Student", "teachers.Teacher", "users.User"],
-    "show_sidebar": True,
-    "navigation_expanded": True,
-    "show_ui_builder": False,
-    "icons": {
-        # Plataforma SaaS
-        "platform.Plan":               "fas fa-tag",
-        "platform.TenantSubscription": "fas fa-handshake",
-        "platform.PlatformInvoice":    "fas fa-file-invoice-dollar",
-        "platform.PlatformCost":       "fas fa-receipt",
-        # Tenants y usuarios
-        "tenants.Tenant": "fas fa-school",
-        "tenants.Domain": "fas fa-globe",
-        "users.User": "fas fa-user-shield",
-        # Gestión escolar
-        "students.Student": "fas fa-child",
-        "students.Guardian": "fas fa-user-friends",
-        "students.MedicalRecord": "fas fa-notes-medical",
-        "teachers.Teacher": "fas fa-chalkboard-teacher",
-        "teachers.TeacherContract": "fas fa-file-contract",
-        "teachers.TeacherPayment": "fas fa-money-check-alt",
-        "classrooms.Classroom": "fas fa-door-open",
-        "attendance.Attendance": "fas fa-calendar-check",
-        # Finanzas
-        "enrollments.Enrollment": "fas fa-clipboard-list",
-        "payments.MonthlyFee": "fas fa-file-invoice-dollar",
-        "payments.Payment": "fas fa-credit-card",
-        "cashflow.CashCategory": "fas fa-tags",
-        "cashflow.CashTransaction": "fas fa-exchange-alt",
-        "cashflow.MonthlyClosure": "fas fa-lock",
-        # Operaciones
-        "communications.Communication": "fas fa-envelope",
-        "notifications.EmailLog": "fas fa-paper-plane",
-        "dashboard.DashboardMetric": "fas fa-chart-line",
-        "migrations_academic.AcademicMigration": "fas fa-graduation-cap",
-    },
-    "default_icon_parents": "fas fa-folder",
-    "default_icon_children": "fas fa-circle",
-    "order_with_respect_to": [
-        "platform",
-        "tenants",
-        "users",
-        "students",
-        "teachers",
-        "classrooms",
-        "attendance",
-        "enrollments",
-        "payments",
-        "cashflow",
-        "communications",
-        "notifications",
-        "dashboard",
-        "migrations_academic",
-    ],
-    "custom_links": {},
-    "topmenu_links": [
-        {"name": "Dashboard COREM", "url": "/admin/dashboard/", "permissions": ["auth.view_user"]},
-        {"name": "Crear jardín",    "url": "admin:tenants_tenant_crear_jardin", "permissions": ["auth.view_user"]},
-        {"name": "Volver al SaaS",  "url": "/", "new_window": True},
-    ],
-    "usermenu_links": [
-        {"name": "Volver al SaaS", "url": "/", "new_window": True},
-    ],
-    "language_chooser": False,
-    "changeform_format": "horizontal_tabs",
-}
+# Email del SuperAdmin de la plataforma SaaS. Lo usa `notificar_vencimientos`
+# y demás jobs del cron consolidado para reportar trials por vencer y cobros
+# del día. Override por env var en producción.
+SUPERADMIN_EMAIL = os.environ.get("SUPERADMIN_EMAIL", "stephano.cornejoc@gmail.com")
 
-_JAZZMIN_UI_TWEAKS_LEGACY = {
-    "navbar_small_text": False,
-    "footer_small_text": False,
-    "body_small_text": False,
-    "brand_small_text": False,
-    "brand_colour": "navbar-teal",
-    "accent": "accent-teal",
-    "navbar": "navbar-teal navbar-dark",
-    "no_navbar_border": True,
-    "navbar_fixed": True,
-    "layout_boxed": False,
-    "footer_fixed": False,
-    "sidebar_fixed": True,
-    "sidebar": "sidebar-dark-teal",
-    "sidebar_nav_small_text": False,
-    "sidebar_disable_expand": False,
-    "sidebar_nav_child_indent": True,
-    "sidebar_nav_compact_style": False,
-    "sidebar_nav_legacy_style": False,
-    "sidebar_nav_flat_style": False,
-    "theme": "flatly",
-    "dark_mode_theme": "darkly",
-    "button_classes": {
-        "primary": "btn-primary",
-        "secondary": "btn-secondary",
-        "info": "btn-info",
-        "warning": "btn-warning",
-        "danger": "btn-danger",
-        "success": "btn-success",
-    },
-    "actions_sticky_top": True,
-}
+# Dominio base del SaaS Kiddo. Se usa en `apps/tenants/admin.py` para armar
+# el dominio default de cada jardín nuevo (`<schema>.miniddo.com`) cuando
+# Stephano hace "+ Crear nuevo jardín" desde el Hub.
+#
+# El wildcard SSL universal de Cloudflare ya cubre `*.miniddo.com`, así que
+# cada subdominio generado tiene HTTPS automático sin más configuración.
+#
+# Override por env var en producción si llegáramos a tener un dominio
+# alternativo (white-label, segundo SaaS, etc.).
+TENANT_BASE_DOMAIN = os.environ.get("TENANT_BASE_DOMAIN", "miniddo.com")
+
+
+# Datos para el cobro mensual del SaaS al jardín (PlatformInvoice).
+# Estos valores aparecen en el email de cobro y en el QR Yape adjunto.
+COREM_BUSINESS_NAME = os.environ.get("COREM_BUSINESS_NAME", "COREM Labs S.A.C.")
+COREM_YAPE_PHONE = os.environ.get("COREM_YAPE_PHONE", "")  # Ej: "999888777"
+COREM_PLIN_PHONE = os.environ.get("COREM_PLIN_PHONE", "")  # Ej: "999888777"
+
+# Branding del admin se configura en `config/admin_site.py` (CoremAdminSite)
+# y en `templates/admin/base_site.html`. Las legacy settings de jazzmin
+# fueron removidas — la integración con jazzmin/django-unfold se descartó
+# por incompatibilidad con Python 3.14.

@@ -3,7 +3,7 @@
 import pytest
 from django.contrib.auth import get_user_model
 
-from apps.users.factories import ProfesorFactory, SuperadminFactory, UserFactory
+from apps.users.factories import SuperadminFactory, UserFactory
 
 User = get_user_model()
 
@@ -73,18 +73,6 @@ class TestUserRoleProperties:
         user = UserFactory(role="ADMIN_JARDIN")
         assert user.is_admin_jardin is True
         assert user.is_superadmin is False
-
-    def test_is_director(self, tenant):
-        user = UserFactory(role="DIRECTOR")
-        assert user.is_director is True
-
-    def test_is_secretaria(self, tenant):
-        user = UserFactory(role="SECRETARIA")
-        assert user.is_secretaria is True
-
-    def test_is_profesor(self, tenant):
-        user = ProfesorFactory()
-        assert user.is_profesor is True
 
 
 class TestUserStr:

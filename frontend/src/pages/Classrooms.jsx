@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Table,
   Button,
@@ -17,14 +17,15 @@ import api from "../services/api";
 
 const { Title, Text } = Typography;
 
-const currentYear = new Date().getFullYear();
-
 const nivelOpciones = [
   { value: 2, label: "2 años" },
   { value: 3, label: "3 años" },
   { value: 4, label: "4 años" },
   { value: 5, label: "5 años" },
 ];
+
+// Helper: arma el label de un profesor para los selects.
+const teacherLabel = (t) => `${t.nombres} ${t.apellidos}`.trim();
 
 export default function Classrooms() {
   const [classrooms, setClassrooms] = useState([]);
@@ -75,13 +76,32 @@ export default function Classrooms() {
       nivel_edad: record.nivel_edad,
       capacidad: record.capacidad,
       profesor_titular: record.profesor_titular,
+      profesor_auxiliar: record.profesor_auxiliar,
     });
     setModalOpen(true);
   };
 
+  // Divido los profesores por tipo para alimentar los selects del form.
+  // Compatibilidad legacy: si un Teacher no trae `tipo`, lo trato como TITULAR.
+  const titulares = useMemo(
+    () => teachers.filter((t) => (t.tipo ?? "TITULAR") === "TITULAR"),
+    [teachers],
+  );
+  const auxiliares = useMemo(
+    () => teachers.filter((t) => t.tipo === "AUXILIAR"),
+    [teachers],
+  );
+
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
+      if (
+        values.profesor_auxiliar &&
+        values.profesor_auxiliar === values.profesor_titular
+      ) {
+        message.error("El titular y el auxiliar no pueden ser la misma persona");
+        return;
+      }
       setSaving(true);
       if (editingClassroom) {
         await api.patch(`/classrooms/${editingClassroom.id}/`, values);
@@ -146,10 +166,17 @@ export default function Classrooms() {
       ),
     },
     {
-      title: "Profesora titular",
+      title: "Profesor(a) titular",
       dataIndex: "profesor_titular_nombre",
       key: "profesor_titular_nombre",
       render: (nombre) => nombre ?? <Text type="secondary">Sin asignar</Text>,
+    },
+    {
+      title: "Profesor(a) auxiliar",
+      dataIndex: "profesor_auxiliar_nombre",
+      key: "profesor_auxiliar_nombre",
+      render: (nombre) =>
+        nombre ?? <Text type="secondary" italic>— sin auxiliar —</Text>,
     },
     {
       title: "Acciones",
@@ -240,14 +267,43 @@ export default function Classrooms() {
             </Form.Item>
           </div>
 
-          <Form.Item name="profesor_titular" label="Profesora titular">
+          <Form.Item
+            name="profesor_titular"
+            label="Profesor(a) titular"
+            rules={[{ required: true, message: "Seleccione el profesor titular" }]}
+            tooltip="Solo se listan profesores con tipo Titular. Si no aparece quien buscás, cambiá su tipo en la sección Profesores."
+          >
+            <Select
+              placeholder={
+                titulares.length
+                  ? "Seleccione un profesor titular"
+                  : "No hay profesores titulares — créalos en Profesores"
+              }
+              options={titulares.map((t) => ({
+                value: t.id,
+                label: teacherLabel(t),
+              }))}
+              notFoundContent="Sin titulares disponibles"
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="profesor_auxiliar"
+            label="Profesor(a) auxiliar (opcional)"
+            tooltip="Solo se listan profesores con tipo Auxiliar. Dejá vacío si el aula no tiene auxiliar."
+          >
             <Select
               allowClear
-              placeholder="Seleccione una profesora"
-              options={teachers.map((t) => ({
+              placeholder={
+                auxiliares.length
+                  ? "Seleccione un profesor auxiliar (opcional)"
+                  : "Aún no hay profesores auxiliares registrados"
+              }
+              options={auxiliares.map((t) => ({
                 value: t.id,
-                label: `${t.nombres} ${t.apellidos}`,
+                label: teacherLabel(t),
               }))}
+              notFoundContent="Sin auxiliares disponibles"
             />
           </Form.Item>
         </Form>

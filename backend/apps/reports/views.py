@@ -1,9 +1,9 @@
 from datetime import date
 from decimal import Decimal
-from io import BytesIO
+from tempfile import SpooledTemporaryFile
 
 from django.db.models import Count, Q
-from django.http import HttpResponse
+from django.http import FileResponse
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from rest_framework import status, viewsets
@@ -11,9 +11,12 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from rest_framework.permissions import IsAuthenticated
-
 from shared.validators import validate_month_param, validate_year_param
+
+# Umbral para que el archivo se mantenga en RAM. Si el reporte crece más,
+# SpooledTemporaryFile lo derrama automáticamente a disco temporal —
+# el SO maneja la limpieza al cerrar el handle.
+_SPOOL_MAX_BYTES = 4 * 1024 * 1024  # 4 MB
 
 
 def _style_header(ws, headers, row=1):
@@ -37,17 +40,21 @@ def _style_header(ws, headers, row=1):
 
 
 def _build_response(wb, filename):
-    """Genera HttpResponse con el archivo Excel."""
-    buffer = BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-
-    response = HttpResponse(
-        buffer.getvalue(),
+    """
+    Genera FileResponse con el archivo Excel. Usa SpooledTemporaryFile que
+    mantiene el archivo en RAM hasta 4MB y lo derrama a disco si crece más.
+    FileResponse luego lo envía en chunks al cliente, evitando que el
+    workbook entero permanezca duplicado en memoria mientras se serializa.
+    """
+    spool = SpooledTemporaryFile(max_size=_SPOOL_MAX_BYTES)
+    wb.save(spool)
+    spool.seek(0)
+    return FileResponse(
+        spool,
+        as_attachment=True,
+        filename=filename,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
-    response["Content-Disposition"] = f'attachment; filename="{filename}"'
-    return response
 
 
 class ReportViewSet(viewsets.ViewSet):

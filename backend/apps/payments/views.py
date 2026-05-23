@@ -21,7 +21,6 @@ from .serializers import (
     PaymentListSerializer,
     PaymentRegisterSerializer,
 )
-from .services import generate_yape_qr
 
 
 MES_INICIO_ESCOLAR = 3   # Marzo
@@ -55,7 +54,11 @@ def _ensure_yearly_payments(student, monthly_fee, anio):
             )
         )
     if creados:
-        Payment.objects.bulk_create(creados)
+        # ignore_conflicts=True protege contra race condition: si dos requests
+        # llaman a por_alumno simultáneamente para el mismo (student, anio),
+        # el unique_together (student, mes, anio) garantiza que solo una
+        # inserción gane y el resto se descarta sin error.
+        Payment.objects.bulk_create(creados, ignore_conflicts=True)
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
@@ -111,17 +114,6 @@ class PaymentViewSet(viewsets.ModelViewSet):
             )
 
         return Response(PaymentDetailSerializer(payment).data)
-
-    @action(detail=True, methods=["get", "post"], url_path="generar-qr")
-    def generar_qr(self, request, pk=None):
-        """Genera un codigo QR para el pago (PNG image)."""
-        from django.http import HttpResponse
-
-        payment = self.get_object()
-        qr_bytes = generate_yape_qr(payment.student, payment)
-        response = HttpResponse(qr_bytes, content_type="image/png")
-        response["Cache-Control"] = "no-cache"
-        return response
 
     @action(detail=False, methods=["get"], url_path="por-alumno")
     def por_alumno(self, request):

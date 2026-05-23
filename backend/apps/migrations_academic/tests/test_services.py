@@ -102,9 +102,20 @@ class TestExecuteMigration:
         assert detail.estado_nuevo == "ACTIVO"
 
 
-class TestCleanupGraduated:
+class TestCleanupOldData:
+    """Tests del servicio `cleanup_graduated` / `cleanup_old_data`.
+
+    Comportamiento ACTUAL (post-refactor): ELIMINA por completo los datos
+    de alumnos egresados hace más de `years_to_keep` años. Antes se
+    anonimizaba — ahora se elimina y los totales históricos quedan
+    preservados en `MonthlyClosure`.
+
+    Cascadas: borrar Student arrastra Guardian, MedicalRecord, Enrollment,
+    MonthlyFee, Payment, Attendance, MigrationDetail.
+    """
+
     def _create_old_graduated(self, tenant, superadmin_user, years_ago=3):
-        """Helper: create a graduated student with a migration from years_ago."""
+        """Helper: crea un alumno EGRESADO con una migración antigua."""
         current_year = date.today().year
         past_year = current_year - years_ago
 
@@ -113,7 +124,6 @@ class TestCleanupGraduated:
         guardian = GuardianFactory(student=student, es_principal=True)
         medical = MedicalRecordFactory(student=student)
 
-        # Create migration and backdate it
         migration = AcademicMigration.objects.create(
             anio_origen=past_year,
             anio_destino=past_year + 1,
@@ -121,7 +131,6 @@ class TestCleanupGraduated:
             status="EJECUTADO",
             total_migrados=1,
         )
-        # Backdate the migration fecha
         AcademicMigration.objects.filter(pk=migration.pk).update(
             fecha=timezone.now() - timedelta(days=years_ago * 365 + 10)
         )
@@ -137,54 +146,77 @@ class TestCleanupGraduated:
 
         return student, guardian, medical
 
-    def test_anonymizes_data(self, tenant, superadmin_user):
-        student, guardian, medical = self._create_old_graduated(
+    def test_returns_summary_dict(self, tenant, superadmin_user):
+        """El servicio retorna un dict con conteos (alumnos_eliminados,
+        transacciones_eliminadas, meses_auto_sellados, cutoff_year)."""
+        self._create_old_graduated(tenant, superadmin_user, years_ago=3)
+
+        result = cleanup_graduated(years_to_keep=2)
+
+        assert isinstance(result, dict)
+        assert "alumnos_eliminados" in result
+        assert "transacciones_eliminadas" in result
+        assert result["alumnos_eliminados"] >= 1
+
+    def test_deletes_old_graduated_student(self, tenant, superadmin_user):
+        """Alumno EGRESADO hace 3 años con years_to_keep=2 debe eliminarse."""
+        from apps.students.models import Student
+
+        student, _, _ = self._create_old_graduated(
             tenant, superadmin_user, years_ago=3
         )
-        original_name = student.nombres
+        student_pk = student.pk
 
-        count = cleanup_graduated(years_to_keep=2)
+        cleanup_graduated(years_to_keep=2)
 
-        assert count >= 1
-        student.refresh_from_db()
-        assert student.nombres == "ANONIMIZADO"
-        assert student.apellidos == "ANONIMIZADO"
-        assert student.dni.startswith("XXXX")
+        assert not Student.objects.filter(pk=student_pk).exists()
 
     def test_respects_years_limit(self, tenant, superadmin_user):
-        """Students within the retention period should NOT be anonymized."""
+        """Alumnos con enrollment reciente (dentro del periodo de retención)
+        NO se eliminan. La lógica del servicio EXCLUYE alumnos con
+        `enrollments__anio_escolar__gt=cutoff_year`.
+        """
+        from apps.enrollments.models import Enrollment
+        from apps.students.models import Student
+        from decimal import Decimal
+
         student, _, _ = self._create_old_graduated(
             tenant, superadmin_user, years_ago=1
         )
+        # Agregamos un enrollment del año actual para que entre en la
+        # ventana de retención (cutoff_year = current_year - 2 con
+        # years_to_keep=2; un enrollment del año actual está por encima).
+        current_year = date.today().year
+        Enrollment.objects.create(
+            student=student,
+            anio_escolar=current_year,
+            costo_matricula=Decimal("250.00"),
+        )
 
-        count = cleanup_graduated(years_to_keep=2)
+        cleanup_graduated(years_to_keep=2)
 
-        student.refresh_from_db()
-        # Student is within 2-year window -- should not be anonymized
-        assert student.nombres != "ANONIMIZADO"
+        # Tiene enrollment reciente → permanece
+        assert Student.objects.filter(pk=student.pk).exists()
 
     def test_rejects_zero_years(self, tenant):
         with pytest.raises(ValueError, match="al menos 1"):
             cleanup_graduated(years_to_keep=0)
 
-    def test_anonymizes_guardians(self, tenant, superadmin_user):
-        student, guardian, _ = self._create_old_graduated(
+    def test_rejects_excessive_years(self, tenant):
+        with pytest.raises(ValueError, match="exceder"):
+            cleanup_graduated(years_to_keep=11)
+
+    def test_cascade_deletes_guardian_and_medical(self, tenant, superadmin_user):
+        """Al eliminar el alumno, Guardian y MedicalRecord se borran en cascade."""
+        from apps.students.models import Guardian, MedicalRecord
+
+        _, guardian, medical = self._create_old_graduated(
             tenant, superadmin_user, years_ago=3
         )
+        guardian_pk = guardian.pk
+        medical_pk = medical.pk
 
         cleanup_graduated(years_to_keep=2)
 
-        guardian.refresh_from_db()
-        assert guardian.nombres == "ANONIMIZADO"
-        assert guardian.telefono == ""
-
-    def test_anonymizes_medical_record(self, tenant, superadmin_user):
-        student, _, medical = self._create_old_graduated(
-            tenant, superadmin_user, years_ago=3
-        )
-
-        cleanup_graduated(years_to_keep=2)
-
-        medical.refresh_from_db()
-        assert medical.observaciones == "ANONIMIZADO"
-        assert medical.alergias == "ANONIMIZADO"
+        assert not Guardian.objects.filter(pk=guardian_pk).exists()
+        assert not MedicalRecord.objects.filter(pk=medical_pk).exists()

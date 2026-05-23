@@ -41,3 +41,49 @@ class TestTeacherPayment:
         TeacherPaymentFactory(contract=contract, mes=3, anio=2026)
         with pytest.raises(Exception):
             TeacherPaymentFactory(contract=contract, mes=3, anio=2026)
+
+
+class TestTeacherTipo:
+    """Tests para el campo Teacher.tipo (TITULAR / AUXILIAR)."""
+
+    def test_default_tipo_is_titular(self, tenant):
+        """Sin especificar tipo, debe ser TITULAR (preserva compatibilidad
+        con profesores existentes antes de la migration 0004)."""
+        teacher = Teacher.objects.create(
+            dni="40000001",
+            nombres="Rosa",
+            apellidos="Castro",
+            telefono="987654321",
+            fecha_ingreso=date.today(),
+        )
+        assert teacher.tipo == "TITULAR"
+        assert teacher.tipo == Teacher.Tipo.TITULAR
+
+    def test_can_create_auxiliar(self, tenant):
+        """Un profesor puede crearse explícitamente como AUXILIAR."""
+        teacher = Teacher.objects.create(
+            dni="40000002",
+            nombres="Lucia",
+            apellidos="Mendoza",
+            telefono="987654322",
+            tipo=Teacher.Tipo.AUXILIAR,
+            fecha_ingreso=date.today(),
+        )
+        assert teacher.tipo == "AUXILIAR"
+
+    def test_factory_defaults_titular(self, tenant):
+        """TeacherFactory respeta el default TITULAR de la factory."""
+        teacher = TeacherFactory()
+        assert teacher.tipo == "TITULAR"
+
+    def test_factory_override_auxiliar(self, tenant):
+        """TeacherFactory acepta override explícito de tipo."""
+        teacher = TeacherFactory(tipo="AUXILIAR")
+        assert teacher.tipo == "AUXILIAR"
+
+    def test_choices_are_titular_and_auxiliar(self, tenant):
+        """Solo se aceptan los dos valores del TextChoices."""
+        choices = dict(Teacher._meta.get_field("tipo").choices)
+        assert set(choices.keys()) == {"TITULAR", "AUXILIAR"}
+        assert choices["TITULAR"] == "Titular"
+        assert choices["AUXILIAR"] == "Auxiliar"

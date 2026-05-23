@@ -52,22 +52,6 @@
       {% endfor %}
     </fieldset>
 
-    <fieldset class="module aligned">
-      <h2>Suscripción</h2>
-      {% for field in form %}
-        {% if field.name in 'precio_mensual,dias_trial,dia_cobro' %}
-          <div class="form-row">
-            <div>
-              <label for="{{ field.id_for_label }}"{% if field.field.required %} class="required"{% endif %}>{{ field.label }}:</label>
-              {{ field }}
-              {% if field.help_text %}<p class="help">{{ field.help_text }}</p>{% endif %}
-              {% if field.errors %}<ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
-            </div>
-          </div>
-        {% endif %}
-      {% endfor %}
-    </fieldset>
-
     <fieldset class="module aligned collapse">
       <h2>Configuración técnica (opcional)</h2>
       {% for field in form %}

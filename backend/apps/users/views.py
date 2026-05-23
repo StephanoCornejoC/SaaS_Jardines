@@ -26,7 +26,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.role in ['SUPERADMIN', 'ADMIN_JARDIN', 'DIRECTOR']:
+        if user.role in ['SUPERADMIN', 'ADMIN_JARDIN']:
             return User.objects.all()
         return User.objects.filter(pk=user.pk)
 

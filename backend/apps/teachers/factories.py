@@ -12,6 +12,7 @@ class TeacherFactory(factory.django.DjangoModelFactory):
     dni = factory.Sequence(lambda n: f"{10000000 + n:08d}")
     nombres = factory.Faker("first_name", locale="es")
     apellidos = factory.Faker("last_name", locale="es")
+    tipo = "TITULAR"
     especialidad = "Educacion Inicial"
     telefono = factory.Sequence(lambda n: f"9{70000000 + n}")
     email = factory.LazyAttribute(lambda o: f"{o.nombres.lower()}.teacher@test.com")

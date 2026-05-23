@@ -2,7 +2,49 @@ from decimal import Decimal
 
 from django.db.models import Sum
 
-from .models import CashTransaction, MonthlyClosure
+from .models import CashCategory, CashTransaction, MonthlyClosure
+
+
+# Categorías sistema que cada jardín debe tener al arrancar. Se auto-crean
+# vía `ensure_categorias_sistema()` al crear un tenant nuevo. Las marcadas
+# como `es_sistema=True` no pueden borrarse desde el admin.
+#
+# Diseño:
+#   - "Pensiones" (INGRESO) y "Sueldos" (EGRESO) ya se auto-crean cuando se
+#     registra el primer pago real (payments.views.registrar_pago y
+#     teachers.views.registrar_sueldo). Acá las pre-creamos para que
+#     aparezcan en el selector del frontend ANTES del primer pago.
+#   - "Otros" en ambos tipos cubre cualquier gasto/ingreso que no encaje
+#     en las categorías principales (donaciones, eventos, material, etc).
+SISTEMA_CATEGORIES = [
+    # (nombre, tipo)   — tipo=None significa bidireccional (sirve para
+    # INGRESO y EGRESO). Usado para "Otros" que cubre gastos/ingresos
+    # varios sin obligar a tener dos categorías separadas.
+    ("Pensiones", CashCategory.Tipo.INGRESO),
+    ("Sueldos",   CashCategory.Tipo.EGRESO),
+    ("Otros",     None),
+]
+
+
+def ensure_categorias_sistema():
+    """Garantiza que existan las categorías sistema. Idempotente.
+
+    Debe llamarse DENTRO de un `schema_context(<tenant>)` porque las
+    categorías viven en cada schema tenant (TENANT_APPS).
+    """
+    created = 0
+    existing = 0
+    for nombre, tipo in SISTEMA_CATEGORIES:
+        _, was_created = CashCategory.objects.get_or_create(
+            nombre=nombre,
+            tipo=tipo,
+            defaults={"es_sistema": True, "activo": True},
+        )
+        if was_created:
+            created += 1
+        else:
+            existing += 1
+    return {"created": created, "existing": existing}
 
 
 def get_balance(mes, anio):

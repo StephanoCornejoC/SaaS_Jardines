@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -13,6 +14,9 @@ class Classroom(models.Model):
         choices=NivelEdad.choices, verbose_name="Nivel de edad"
     )
     capacidad = models.PositiveIntegerField(default=25, verbose_name="Capacidad")
+    # `limit_choices_to` filtra el queryset del admin/ModelForm para que solo
+    # aparezcan profesores del tipo correcto. La validación dura sigue en
+    # `clean()` por si alguien fuerza el FK por API o ORM.
     profesor_titular = models.ForeignKey(
         "teachers.Teacher",
         on_delete=models.SET_NULL,
@@ -20,6 +24,7 @@ class Classroom(models.Model):
         blank=True,
         related_name="aulas_titular",
         verbose_name="Profesor titular",
+        limit_choices_to={"tipo": "TITULAR"},
     )
     profesor_auxiliar = models.ForeignKey(
         "teachers.Teacher",
@@ -28,6 +33,7 @@ class Classroom(models.Model):
         blank=True,
         related_name="aulas_auxiliar",
         verbose_name="Profesor auxiliar",
+        limit_choices_to={"tipo": "AUXILIAR"},
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -47,3 +53,33 @@ class Classroom(models.Model):
     @property
     def disponible(self):
         return self.alumnos_count < self.capacidad
+
+    def clean(self):
+        """Validaciones a nivel modelo (corre en admin y full_clean explícito).
+
+        - profesor_titular debe ser de tipo TITULAR.
+        - profesor_auxiliar debe ser de tipo AUXILIAR.
+        - No pueden ser el mismo profesor.
+        """
+        super().clean()
+        errors = {}
+        if self.profesor_titular_id and self.profesor_titular.tipo != "TITULAR":
+            errors["profesor_titular"] = (
+                "El profesor titular debe ser de tipo TITULAR. "
+                f"'{self.profesor_titular}' es {self.profesor_titular.get_tipo_display()}."
+            )
+        if self.profesor_auxiliar_id and self.profesor_auxiliar.tipo != "AUXILIAR":
+            errors["profesor_auxiliar"] = (
+                "El profesor auxiliar debe ser de tipo AUXILIAR. "
+                f"'{self.profesor_auxiliar}' es {self.profesor_auxiliar.get_tipo_display()}."
+            )
+        if (
+            self.profesor_titular_id
+            and self.profesor_auxiliar_id
+            and self.profesor_titular_id == self.profesor_auxiliar_id
+        ):
+            errors["profesor_auxiliar"] = (
+                "El profesor titular y el auxiliar no pueden ser la misma persona."
+            )
+        if errors:
+            raise ValidationError(errors)

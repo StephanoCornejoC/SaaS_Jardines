@@ -33,17 +33,6 @@ class TestEnrollmentViewSet:
         response = client.post("/api/v1/enrollments/", data, format="json")
         assert response.status_code == 201
 
-    def test_create_enrollment_as_profesor_forbidden(self, auth_client, profesor_user):
-        student = StudentFactory()
-        client = auth_client(profesor_user)
-        data = {
-            "student": student.pk,
-            "anio_escolar": date.today().year,
-            "costo_matricula": "250.00",
-        }
-        response = client.post("/api/v1/enrollments/", data, format="json")
-        assert response.status_code == 403
-
     def test_filter_by_anio(self, auth_client, admin_user):
         current_year = date.today().year
         EnrollmentFactory(anio_escolar=current_year)

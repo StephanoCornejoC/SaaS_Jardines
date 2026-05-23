@@ -77,9 +77,6 @@ class Payment(models.Model):
         verbose_name="Método de pago",
     )
     comprobante = models.CharField(max_length=200, blank=True, verbose_name="Comprobante")
-    qr_code = models.ImageField(
-        upload_to="qr_codes/", null=True, blank=True, verbose_name="Código QR"
-    )
     observaciones = models.TextField(blank=True)
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,

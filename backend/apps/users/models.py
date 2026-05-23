@@ -9,15 +9,14 @@ from .managers import CustomUserManager
 class User(AbstractUser):
     """
     Usuario personalizado. Usa email como campo de autenticación en lugar de username.
-    El producto comercial solo permite un rol (ADMIN_JARDIN) y una sesión activa por usuario.
+    El producto comercial solo permite un rol funcional (ADMIN_JARDIN). El
+    SUPERADMIN existe únicamente para el panel de COREM y NO puede operar
+    dentro de un tenant.
     """
 
     class Role(models.TextChoices):
         SUPERADMIN = "SUPERADMIN", "Superadmin"
         ADMIN_JARDIN = "ADMIN_JARDIN", "Admin Jardín"
-        DIRECTOR = "DIRECTOR", "Director(a)"
-        SECRETARIA = "SECRETARIA", "Secretaria"
-        PROFESOR = "PROFESOR", "Profesor(a)"
 
     # Eliminar username, usar email como identificador
     username = None
@@ -62,15 +61,3 @@ class User(AbstractUser):
     @property
     def is_admin_jardin(self) -> bool:
         return self.role == self.Role.ADMIN_JARDIN
-
-    @property
-    def is_director(self) -> bool:
-        return self.role == self.Role.DIRECTOR
-
-    @property
-    def is_secretaria(self) -> bool:
-        return self.role == self.Role.SECRETARIA
-
-    @property
-    def is_profesor(self) -> bool:
-        return self.role == self.Role.PROFESOR

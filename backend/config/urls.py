@@ -1,17 +1,18 @@
 """URL configuration for tenant schemas."""
 from django.contrib import admin
-from django.urls import include, path
+from django.urls import path, include
 
+from apps.platform.views import admin_dashboard
+from config.admin_views import enter_tenant_mode_view, exit_tenant_mode_view
 from shared.views import protected_media
 
-# Branding del admin nativo
-admin.site.site_title = "COREM Admin"
-admin.site.site_header = "COREM SaaS — Panel"
-admin.site.index_title = "Panel de administración"
-
 urlpatterns = [
-    # Admin (accesible en schema tenant solo si alguien llega por ese dominio;
-    # el superadmin lo usa desde localhost que ya apunta al schema public)
+    # Dashboard del SUPERADMIN (debe ir ANTES de admin.site.urls)
+    path("admin/dashboard/", admin_dashboard, name="platform_dashboard"),
+    # Modo "Operar jardín": entra/sale (toggle de session var).
+    path("admin/op/exit/", exit_tenant_mode_view, name="admin_exit_tenant_mode"),
+    path("admin/op/<str:schema>/", enter_tenant_mode_view, name="admin_enter_tenant_mode"),
+    # Admin único — su comportamiento cambia según session['active_tenant_schema'].
     path("admin/", admin.site.urls),
     # API v1
     path("api/v1/auth/", include("apps.users.urls")),

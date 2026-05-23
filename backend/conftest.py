@@ -108,19 +108,10 @@ def admin_user(tenant):
     return _create_user("admin@test.com", "ADMIN_JARDIN")
 
 
-@pytest.fixture()
-def director_user(tenant):
-    return _create_user("director@test.com", "DIRECTOR")
-
-
-@pytest.fixture()
-def secretaria_user(tenant):
-    return _create_user("secretaria@test.com", "SECRETARIA")
-
-
-@pytest.fixture()
-def profesor_user(tenant):
-    return _create_user("profesor@test.com", "PROFESOR")
+# Las fixtures director_user, secretaria_user y profesor_user fueron
+# eliminadas tras el cleanup #55: el SaaS solo tiene 2 roles vigentes
+# (SUPERADMIN y ADMIN_JARDIN). Cualquier test que pruebe "non-admin
+# rechazado" ahora debe usar otro mecanismo (anónimo, o saltearse).
 
 
 # ---------------------------------------------------------------------------

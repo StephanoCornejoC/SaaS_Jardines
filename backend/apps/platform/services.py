@@ -1,19 +1,123 @@
 """Servicios de la plataforma SaaS: cobros, morosidad, métricas."""
 
+import logging
 from calendar import monthrange
 from collections import OrderedDict
 from datetime import date, timedelta
 from decimal import Decimal
+from io import BytesIO
 
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives, send_mail
 from django.db.models import Count, Q, Sum
 
 from apps.tenants.models import Tenant
 
 from .models import Plan, PlatformCost, PlatformInvoice, TenantSubscription
 
+logger = logging.getLogger(__name__)
+
+
+_MESES_ES = (
+    "", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def _build_yape_qr_png(phone, amount, concept):
+    """
+    Genera un PNG con un QR que contiene un string legible de pago Yape.
+    Devuelve bytes del PNG, o None si `qrcode` no está disponible o falta phone.
+    """
+    if not phone:
+        return None
+    try:
+        import qrcode  # type: ignore
+    except ImportError:
+        return None
+    try:
+        payload = f"YAPE | {phone} | S/ {amount:.2f} | {concept}"
+        img = qrcode.make(payload)
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception as e:
+        logger.warning(f"No se pudo generar QR Yape: {e}")
+        return None
+
+
+def send_invoice_email(invoice):
+    """
+    Envía al tenant un email con el cobro mensual del SaaS y un QR Yape
+    para pagar (si COREM_YAPE_PHONE está configurado). Si el tenant no
+    tiene email, solo logea.
+    """
+    tenant = invoice.tenant
+    destinatario = (tenant.email or "").strip()
+    if not destinatario:
+        logger.info(f"Tenant {tenant.schema_name} sin email; cobro {invoice.id} no notificado")
+        return {"sent": False, "reason": "no email"}
+
+    business = getattr(settings, "COREM_BUSINESS_NAME", "COREM")
+    yape = getattr(settings, "COREM_YAPE_PHONE", "")
+    plin = getattr(settings, "COREM_PLIN_PHONE", "")
+
+    mes_label = f"{_MESES_ES[invoice.mes]} {invoice.anio}".capitalize()
+    concepto = f"{business} - {tenant.nombre} - {invoice.mes:02d}/{invoice.anio}"
+
+    asunto = f"[COREM] Cobro mensual — {mes_label} — S/ {invoice.monto:.2f}"
+    cuerpo_txt = (
+        f"Hola {tenant.nombre},\n\n"
+        f"Le compartimos el cobro mensual de su plataforma COREM correspondiente "
+        f"a {mes_label}.\n\n"
+        f"Monto: S/ {invoice.monto:.2f}\n"
+        f"Vencimiento: {invoice.fecha_vencimiento.strftime('%d/%m/%Y')}\n"
+        f"Concepto: {concepto}\n\n"
+    )
+    if yape:
+        cuerpo_txt += f"Yape: {yape}\n"
+    if plin:
+        cuerpo_txt += f"Plin: {plin}\n"
+    if yape:
+        cuerpo_txt += "\nPuede escanear el código QR adjunto para pagar por Yape.\n"
+    cuerpo_txt += (
+        f"\nUna vez realizado el pago, no necesita confirmarlo aquí — "
+        f"actualizaremos el estado del cobro automáticamente.\n\n"
+        f"Gracias por confiar en {business}.\n"
+        f"— Equipo COREM"
+    )
+
+    msg = EmailMultiAlternatives(
+        subject=asunto,
+        body=cuerpo_txt,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[destinatario],
+    )
+
+    qr_png = _build_yape_qr_png(yape, invoice.monto, concepto) if yape else None
+    if qr_png:
+        msg.attach(f"yape_{invoice.mes:02d}_{invoice.anio}.png", qr_png, "image/png")
+
+    try:
+        msg.send(fail_silently=False)
+        logger.info(f"Email de cobro #{invoice.id} enviado a {destinatario}")
+        return {"sent": True, "to": destinatario, "qr_attached": bool(qr_png)}
+    except Exception as e:
+        logger.error(f"Error enviando email de cobro #{invoice.id}: {e}")
+        return {"sent": False, "error": str(e)}
+
 
 def _ultimo_dia_mes(anio, mes):
     return date(anio, mes, monthrange(anio, mes)[1])
+
+
+def _dia_cobro_efectivo(fecha_alta, anio, mes):
+    """
+    Día del mes en que se emite el cobro para un tenant cuya fecha de alta
+    cayó en `fecha_alta.day`. Si el mes de cobro no tiene ese día (ej: alta
+    el 31 y febrero), se usa el último día disponible del mes.
+    """
+    return min(fecha_alta.day, monthrange(anio, mes)[1])
 
 
 def generar_cobros_del_mes(mes=None, anio=None, dia_venc=10):
@@ -218,3 +322,220 @@ def metricas_dashboard():
         "series": series,
         "distribucion": list(distribucion),
     }
+
+
+def procesar_trials_vencidos(today=None, dry_run=False):
+    """
+    Cambia a ACTIVA toda suscripción con estado=TRIAL y trial_hasta < today.
+    NO emite cobro (Opción B): el primer cobro se emitirá el día del mes
+    igual a fecha_alta (`emitir_cobros_del_dia`).
+    """
+    today = today or date.today()
+    qs = TenantSubscription.objects.filter(
+        estado=TenantSubscription.Estado.TRIAL,
+        trial_hasta__lt=today,
+    ).select_related("tenant")
+
+    finalizados = []
+    for sub in qs:
+        finalizados.append({
+            "tenant": sub.tenant.nombre,
+            "schema": sub.tenant.schema_name,
+            "trial_hasta": sub.trial_hasta,
+        })
+        if not dry_run:
+            sub.estado = TenantSubscription.Estado.ACTIVA
+            sub.save(update_fields=["estado", "actualizado_at"])
+
+    if finalizados:
+        logger.info(f"Trials finalizados: {len(finalizados)}")
+    return {"count": len(finalizados), "items": finalizados}
+
+
+def emitir_cobros_del_dia(today=None, dry_run=False, dias_para_vencer=10, send_email=True):
+    """
+    Emite PlatformInvoice del mes corriente para cada suscripción cuyo
+    día de cobro efectivo == today.day (Opción B: día del mes igual a
+    fecha_alta, recortado al último día del mes si no existe).
+
+    Idempotente: el unique_together (tenant, mes, anio) más get_or_create
+    garantizan que no se duplique. Solo procesa estados ACTIVA y MOROSA.
+    Cuando crea un cobro nuevo y send_email=True, envía email al tenant.
+    """
+    today = today or date.today()
+    anio, mes = today.year, today.month
+
+    qs = TenantSubscription.objects.filter(
+        estado__in=[
+            TenantSubscription.Estado.ACTIVA,
+            TenantSubscription.Estado.MOROSA,
+        ],
+    ).select_related("tenant")
+
+    creados = []
+    ya_existian = 0
+    emails_enviados = 0
+    for sub in qs:
+        dia = _dia_cobro_efectivo(sub.fecha_alta, anio, mes)
+        if today.day != dia:
+            continue
+        if dry_run:
+            creados.append({
+                "tenant": sub.tenant.nombre,
+                "schema": sub.tenant.schema_name,
+                "monto": float(sub.precio_acordado),
+                "would_create": True,
+            })
+            continue
+
+        venc = _ultimo_dia_mes(anio, mes) if today.day + dias_para_vencer > monthrange(anio, mes)[1] \
+            else date(anio, mes, today.day + dias_para_vencer)
+        invoice, was_created = PlatformInvoice.objects.get_or_create(
+            tenant=sub.tenant,
+            mes=mes,
+            anio=anio,
+            defaults={
+                "monto": sub.precio_acordado,
+                "estado": PlatformInvoice.Estado.PENDIENTE,
+                "fecha_emision": today,
+                "fecha_vencimiento": venc,
+            },
+        )
+        if was_created:
+            creados.append({
+                "tenant": sub.tenant.nombre,
+                "schema": sub.tenant.schema_name,
+                "invoice_id": invoice.id,
+                "monto": float(invoice.monto),
+                "fecha_vencimiento": invoice.fecha_vencimiento,
+            })
+            if send_email:
+                result = send_invoice_email(invoice)
+                if result.get("sent"):
+                    emails_enviados += 1
+        else:
+            ya_existian += 1
+
+    logger.info(
+        f"Cobros emitidos hoy ({today}): {len(creados)} nuevos, "
+        f"{ya_existian} ya existían, {emails_enviados} emails enviados"
+    )
+    return {
+        "creados": creados,
+        "ya_existian": ya_existian,
+        "emails_enviados": emails_enviados,
+    }
+
+
+def emitir_cobro_ahora(tenant, today=None, dias_para_vencer=10, send_email=True):
+    """
+    Emite el cobro del mes actual para un tenant específico, ignorando el
+    chequeo de día_cobro. Útil para el botón "Generar cobro ahora" del admin
+    o para casos puntuales (ajustes, demos, recuperación tras error).
+
+    Idempotente vía unique_together. Retorna (invoice, was_created, mensaje).
+    Si crea un cobro nuevo y send_email=True, envía email al tenant.
+    """
+    today = today or date.today()
+    sub = TenantSubscription.objects.filter(tenant=tenant).first()
+    if not sub:
+        return None, False, "El jardín no tiene suscripción asociada."
+    if sub.estado in (
+        TenantSubscription.Estado.CANCELADA,
+        TenantSubscription.Estado.TRIAL,
+    ):
+        return None, False, (
+            f"No se emite cobro: la suscripción está en estado "
+            f"{sub.get_estado_display()}."
+        )
+
+    anio, mes = today.year, today.month
+    venc = _ultimo_dia_mes(anio, mes) if today.day + dias_para_vencer > monthrange(anio, mes)[1] \
+        else date(anio, mes, today.day + dias_para_vencer)
+    invoice, was_created = PlatformInvoice.objects.get_or_create(
+        tenant=tenant,
+        mes=mes,
+        anio=anio,
+        defaults={
+            "monto": sub.precio_acordado,
+            "estado": PlatformInvoice.Estado.PENDIENTE,
+            "fecha_emision": today,
+            "fecha_vencimiento": venc,
+        },
+    )
+    if was_created and send_email:
+        result = send_invoice_email(invoice)
+        sent_msg = (
+            " Email enviado." if result.get("sent")
+            else f" Email NO enviado ({result.get('reason') or result.get('error')})."
+        )
+    else:
+        sent_msg = ""
+
+    msg = (
+        f"Cobro creado: S/ {invoice.monto} (vence {invoice.fecha_vencimiento}).{sent_msg}"
+        if was_created
+        else f"El cobro de {mes:02d}/{anio} ya existía."
+    )
+    return invoice, was_created, msg
+
+
+def notificar_superadmin_resumen(resumen, dry_run=False):
+    """
+    Envía un email al SUPERADMIN_EMAIL con el resumen del cron diario.
+    Si `dry_run=True` o no hay SUPERADMIN_EMAIL configurado, solo logea.
+    """
+    superadmin_email = getattr(settings, "SUPERADMIN_EMAIL", None)
+    if not superadmin_email:
+        logger.warning("SUPERADMIN_EMAIL no está configurado; resumen no enviado")
+        return {"sent": False, "reason": "no SUPERADMIN_EMAIL"}
+
+    today = date.today()
+    trials = resumen.get("trials", {}).get("items", [])
+    cobros = resumen.get("cobros", {}).get("creados", [])
+    morosidad = resumen.get("morosidad", {})
+
+    asunto = f"[COREM SaaS] Resumen del {today.strftime('%d/%m/%Y')}"
+    lineas = [f"Resumen del cron diario — {today.strftime('%d/%m/%Y')}", ""]
+
+    if trials:
+        lineas.append(f"Trials finalizados ({len(trials)}):")
+        for t in trials:
+            lineas.append(f"  - {t['tenant']} (trial hasta {t['trial_hasta']})")
+        lineas.append("")
+    if cobros:
+        total = sum(c["monto"] for c in cobros)
+        lineas.append(f"Cobros emitidos hoy ({len(cobros)}, total S/ {total:.2f}):")
+        for c in cobros:
+            lineas.append(f"  - {c['tenant']}: S/ {c['monto']:.2f} (vence {c['fecha_vencimiento']})")
+        lineas.append("")
+    if morosidad:
+        lineas.append(
+            f"Morosidad: {morosidad.get('morosas', 0)} morosas, "
+            f"{morosidad.get('bloqueadas', 0)} bloqueadas, "
+            f"{morosidad.get('reactivadas', 0)} reactivadas."
+        )
+        lineas.append("")
+
+    if not (trials or cobros or morosidad.get("morosas") or morosidad.get("bloqueadas")):
+        lineas.append("Sin novedades hoy.")
+
+    contenido = "\n".join(lineas)
+
+    if dry_run:
+        logger.info(f"[DRY-RUN] notificar_superadmin_resumen → {superadmin_email}\n{contenido}")
+        return {"sent": False, "dry_run": True, "preview": contenido}
+
+    try:
+        send_mail(
+            subject=asunto,
+            message=contenido,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[superadmin_email],
+            fail_silently=False,
+        )
+        logger.info(f"Resumen enviado a {superadmin_email}")
+        return {"sent": True, "to": superadmin_email}
+    except Exception as e:
+        logger.error(f"Error enviando resumen al SuperAdmin: {e}")
+        return {"sent": False, "error": str(e)}

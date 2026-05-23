@@ -96,7 +96,7 @@ ignore = [
 [tool.ruff.lint.isort]
 # Configuracion de orden de imports (equivalente a isort)
 known-first-party = ["apps", "config", "shared"]
-known-third-party = ["django", "rest_framework", "celery"]
+known-third-party = ["django", "rest_framework"]
 section-order = [
     "future",
     "standard-library",

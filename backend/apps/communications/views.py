@@ -1,10 +1,14 @@
+import logging
 import re
+import threading
 from urllib.parse import quote
 
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import connection
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
+from django_tenants.utils import schema_context
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -14,6 +18,44 @@ from apps.students.models import Guardian
 
 from .models import Communication
 from .serializers import CommunicationSerializer
+
+logger = logging.getLogger(__name__)
+
+
+def _enviar_emails_async(communication_id, emails, asunto, contenido, schema_name):
+    """
+    Envía los emails de la comunicación en background dentro del schema del
+    tenant. Marca la comunicación como enviada al terminar (si al menos un
+    email se envió). Diseñado para correr dentro de un threading.Thread.
+    """
+    enviados = 0
+    errores = 0
+    with schema_context(schema_name):
+        for email in emails:
+            try:
+                send_mail(
+                    subject=asunto,
+                    message=contenido,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=False,
+                )
+                enviados += 1
+            except Exception as e:
+                errores += 1
+                logger.warning(f"Error enviando comunicación a {email}: {e}")
+        if enviados > 0:
+            try:
+                comm = Communication.objects.get(id=communication_id)
+                comm.enviado = True
+                comm.fecha_envio = timezone.now()
+                comm.save(update_fields=["enviado", "fecha_envio"])
+            except Communication.DoesNotExist:
+                pass
+    logger.info(
+        f"Comunicación #{communication_id} en {schema_name}: "
+        f"{enviados} enviados, {errores} errores"
+    )
 
 
 def _normalizar_telefono(telefono):
@@ -110,34 +152,32 @@ class CommunicationViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        errores = []
-        enviados = 0
-        for email in emails:
-            try:
-                send_mail(
-                    subject=communication.titulo,
-                    message=communication.contenido,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[email],
-                    fail_silently=False,
-                )
-                enviados += 1
-            except Exception as e:
-                errores.append({"email": email, "error": str(e)})
-
-        if enviados > 0:
-            communication.enviado = True
-            communication.fecha_envio = timezone.now()
-            communication.save(update_fields=["enviado", "fecha_envio"])
+        # Encolamos el envío en un thread para no bloquear el worker de
+        # gunicorn ~2s por email (30 apoderados = 60s = timeout 502). El
+        # thread captura el schema_name actual y reabre el contexto del
+        # tenant antes de mandar los emails y de marcar la comunicación
+        # como enviada.
+        schema_name = getattr(connection, "schema_name", "public")
+        thread = threading.Thread(
+            target=_enviar_emails_async,
+            args=(
+                communication.id,
+                emails,
+                communication.titulo,
+                communication.contenido,
+                schema_name,
+            ),
+            daemon=True,
+        )
+        thread.start()
 
         return Response(
             {
-                "mensaje": f"Comunicación enviada a {enviados} apoderado(s).",
+                "mensaje": f"Comunicación encolada para envío a {len(emails)} apoderado(s).",
                 "total_emails": len(emails),
-                "enviados": enviados,
-                "errores": errores,
+                "estado": "encolado",
             },
-            status=status.HTTP_200_OK,
+            status=status.HTTP_202_ACCEPTED,
         )
 
     @action(detail=True, methods=["post"], url_path="whatsapp", permission_classes=[IsAuthenticated])

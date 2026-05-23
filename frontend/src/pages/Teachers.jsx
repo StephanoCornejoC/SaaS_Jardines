@@ -6,16 +6,36 @@ import {
   Space,
   Modal,
   Form,
+  Select,
   DatePicker,
   Popconfirm,
+  Tag,
   App,
   Typography,
+  InputNumber,
+  Divider,
 } from "antd";
-import { PlusOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
+import { PlusOutlined, SearchOutlined, UserOutlined, DollarOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import api from "../services/api";
 
 const { Title, Text } = Typography;
+
+const TIPO_OPCIONES = [
+  { value: "TITULAR",  label: "Titular"  },
+  { value: "AUXILIAR", label: "Auxiliar" },
+];
+
+const TIPO_TAG = {
+  TITULAR:  { color: "cyan",    label: "Titular"  },
+  AUXILIAR: { color: "geekblue", label: "Auxiliar" },
+};
+
+const TIPO_CONTRATO_OPCIONES = [
+  { value: "TIEMPO_COMPLETO", label: "Tiempo completo" },
+  { value: "MEDIO_TIEMPO",    label: "Medio tiempo"    },
+  { value: "POR_HORAS",       label: "Por horas"       },
+];
 
 export default function Teachers() {
   const [teachers, setTeachers] = useState([]);
@@ -48,7 +68,7 @@ export default function Teachers() {
   const openCreate = () => {
     setEditingTeacher(null);
     form.resetFields();
-    form.setFieldsValue({ fecha_ingreso: dayjs() });
+    form.setFieldsValue({ fecha_ingreso: dayjs(), tipo: "TITULAR" });
     setModalOpen(true);
   };
 
@@ -58,10 +78,15 @@ export default function Teachers() {
       dni: record.dni,
       nombres: record.nombres,
       apellidos: record.apellidos,
+      tipo: record.tipo || "TITULAR",
       especialidad: record.especialidad,
       telefono: record.telefono,
       email: record.email,
       fecha_ingreso: record.fecha_ingreso ? dayjs(record.fecha_ingreso) : null,
+      // Datos del contrato activo (pre-llenados desde el listado). Si no
+      // hay contrato, el backend lo crea al guardar con `actualizar-sueldo`.
+      sueldo: record.sueldo_actual ? Number(record.sueldo_actual) : null,
+      tipo_contrato: record.tipo_contrato || "TIEMPO_COMPLETO",
     });
     setModalOpen(true);
   };
@@ -73,19 +98,44 @@ export default function Teachers() {
       if (values.fecha_ingreso) {
         values.fecha_ingreso = values.fecha_ingreso.format("YYYY-MM-DD");
       }
+
+      // Separamos los campos del profesor de los del contrato. El contrato
+      // se actualiza por endpoint dedicado para que el cambio de sueldo
+      // sea explícito (incluso si la directora solo cambia el sueldo).
+      const { sueldo, tipo_contrato, ...teacherFields } = values;
+
+      let teacherId;
       if (editingTeacher) {
-        await api.patch(`/teachers/${editingTeacher.id}/`, values);
-        message.success("Datos del profesor actualizados");
+        await api.patch(`/teachers/${editingTeacher.id}/`, teacherFields);
+        teacherId = editingTeacher.id;
       } else {
-        await api.post("/teachers/", values);
-        message.success("Profesor registrado correctamente");
+        const res = await api.post("/teachers/", teacherFields);
+        teacherId = res.data.id;
       }
+
+      // Si la directora ingresó un sueldo, actualizamos/creamos el contrato.
+      if (sueldo !== null && sueldo !== undefined && sueldo !== "") {
+        await api.patch(`/teachers/${teacherId}/actualizar-sueldo/`, {
+          sueldo: String(sueldo),
+          tipo_contrato: tipo_contrato || "TIEMPO_COMPLETO",
+        });
+      }
+
+      message.success(
+        editingTeacher
+          ? "Datos del profesor actualizados"
+          : "Profesor registrado correctamente",
+      );
       setModalOpen(false);
       fetchTeachers();
     } catch (err) {
-      if (err.response?.data) {
-        const errors = Object.values(err.response.data).flat().join(", ");
-        message.error(errors);
+      const data = err.response?.data;
+      if (data) {
+        const msg = data.error
+          || Object.values(data).flat().join(", ");
+        message.error(msg);
+      } else {
+        message.error("Error al guardar el profesor");
       }
     } finally {
       setSaving(false);
@@ -111,7 +161,32 @@ export default function Teachers() {
         <Text strong>{record.nombres} {record.apellidos}</Text>
       ),
     },
+    {
+      title: "Tipo",
+      dataIndex: "tipo",
+      key: "tipo",
+      width: 100,
+      render: (tipo) => {
+        const cfg = TIPO_TAG[tipo] || TIPO_TAG.TITULAR;
+        return <Tag color={cfg.color}>{cfg.label}</Tag>;
+      },
+    },
     { title: "Especialidad", dataIndex: "especialidad", key: "especialidad" },
+    {
+      title: "Sueldo",
+      key: "sueldo_actual",
+      width: 130,
+      render: (_, record) =>
+        record.sueldo_actual ? (
+          <Text strong style={{ color: "#0d9488" }}>
+            S/. {Number(record.sueldo_actual).toFixed(2)}
+          </Text>
+        ) : (
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            sin contrato
+          </Text>
+        ),
+    },
     { title: "Teléfono", dataIndex: "telefono", key: "telefono", width: 120 },
     { title: "Correo", dataIndex: "email", key: "email", ellipsis: true },
     {
@@ -218,13 +293,23 @@ export default function Teachers() {
             </Form.Item>
           </div>
 
-          <Form.Item
-            name="especialidad"
-            label="Especialidad"
-            rules={[{ required: true, message: "Ingrese la especialidad" }]}
-          >
-            <Input placeholder="Ej: Educación Inicial, Psicomotricidad" />
-          </Form.Item>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+            <Form.Item
+              name="tipo"
+              label="Tipo de profesor"
+              rules={[{ required: true, message: "Seleccione el tipo" }]}
+              tooltip="Titular: a cargo del aula. Auxiliar: apoya al titular."
+            >
+              <Select options={TIPO_OPCIONES} placeholder="Seleccionar tipo" />
+            </Form.Item>
+            <Form.Item
+              name="especialidad"
+              label="Especialidad"
+              rules={[{ required: true, message: "Ingrese la especialidad" }]}
+            >
+              <Input placeholder="Ej: Educación Inicial" />
+            </Form.Item>
+          </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
             <Form.Item
@@ -250,6 +335,40 @@ export default function Teachers() {
           >
             <DatePicker format="DD/MM/YYYY" style={{ width: "100%" }} placeholder="dd/mm/aaaa" />
           </Form.Item>
+
+          <Divider style={{ margin: "8px 0 16px" }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              <DollarOutlined style={{ marginRight: 4 }} />
+              Contrato y sueldo
+            </Text>
+          </Divider>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+            <Form.Item
+              name="sueldo"
+              label="Sueldo mensual"
+              tooltip="El sueldo se aplica al contrato activo del profesor. Si no existe, se crea uno nuevo."
+            >
+              <InputNumber
+                style={{ width: "100%" }}
+                min={0}
+                step={50}
+                prefix="S/."
+                precision={2}
+                placeholder="Ej. 1500.00"
+              />
+            </Form.Item>
+            <Form.Item
+              name="tipo_contrato"
+              label="Tipo de contrato"
+            >
+              <Select options={TIPO_CONTRATO_OPCIONES} placeholder="Seleccionar" />
+            </Form.Item>
+          </div>
+          <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: -8, marginBottom: 8 }}>
+            El sueldo se usa en el módulo "Sueldos" para pre-llenar cada pago mensual.
+            Podés modificarlo cuando lo necesites.
+          </Text>
         </Form>
       </Modal>
     </div>

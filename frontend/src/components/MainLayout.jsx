@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { Layout, Menu, Button, Typography, theme, Avatar } from "antd";
+import { Layout, Menu, Button, Typography, theme, Avatar, Space } from "antd";
 import {
   DashboardOutlined,
   TeamOutlined,
@@ -16,11 +16,25 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  WhatsAppOutlined,
+  MailOutlined,
 } from "@ant-design/icons";
 import useAuthStore from "../store/authStore";
 
-const { Header, Sider, Content } = Layout;
-const { Text } = Typography;
+const { Header, Sider, Content, Footer } = Layout;
+const { Text, Link } = Typography;
+
+// Branding del SaaS y datos de soporte. Definidos como constantes para que
+// un cambio futuro (ej. número de WhatsApp distinto por release) sea un toque.
+const APP_NAME = "Kiddo"; // nombre comercial del SaaS, visible al usuario
+const SUPPORT_WHATSAPP_DISPLAY = "+51 940 183 490";
+const SUPPORT_WHATSAPP_INTL = "51940183490"; // sin "+", para wa.me
+const SUPPORT_EMAIL = "stephano.cornejoc@gmail.com";
+const BRAND_NAME = "COREM LABS"; // empresa desarrolladora (atribución en footer)
+
+// Altura aproximada del footer fijo, para reservar espacio inferior del Content
+// y evitar que la última fila quede tapada por el footer.
+const FOOTER_HEIGHT = 56;
 
 const menuItems = [
   {
@@ -51,6 +65,7 @@ const menuItems = [
     children: [
       { key: "/matriculas", icon: <FormOutlined />,   label: "Matrículas" },
       { key: "/pensiones",  icon: <DollarOutlined />, label: "Pensiones"  },
+      { key: "/sueldos",    icon: <DollarOutlined />, label: "Sueldos"    },
       { key: "/caja",       icon: <WalletOutlined />, label: "Caja"       },
     ],
   },
@@ -96,7 +111,7 @@ export default function MainLayout() {
           boxShadow: "2px 0 8px rgba(0,0,0,0.15)",
         }}
       >
-        {/* Logo */}
+        {/* Logo — wordmark KIDDO en teal del SaaS, sin recuadro */}
         <div
           style={{
             height: 64,
@@ -106,26 +121,19 @@ export default function MainLayout() {
             borderBottom: "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          <div
+          <Text
+            strong
             style={{
-              width: 32,
-              height: 32,
-              borderRadius: 8,
-              background: "#0d9488",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              marginRight: collapsed ? 0 : 10,
-              flexShrink: 0,
+              color: "#14b8a6",
+              fontSize: collapsed ? 20 : 24,
+              letterSpacing: collapsed ? 1 : 3,
+              textTransform: "uppercase",
+              lineHeight: 1,
+              fontWeight: 800,
             }}
           >
-            <Text strong style={{ color: "#fff", fontSize: 15, lineHeight: 1 }}>C</Text>
-          </div>
-          {!collapsed && (
-            <Text strong style={{ color: "#fff", fontSize: 17, letterSpacing: 1 }}>
-              COREM
-            </Text>
-          )}
+            {collapsed ? APP_NAME.charAt(0) : APP_NAME}
+          </Text>
         </div>
 
         <Menu
@@ -179,6 +187,9 @@ export default function MainLayout() {
         <Content
           style={{
             margin: 24,
+            // marginBottom extra reserva espacio para el footer fijo, así
+            // la última fila de una tabla larga no queda tapada al hacer scroll.
+            marginBottom: 24 + FOOTER_HEIGHT,
             padding: 24,
             background: colorBgContainer,
             borderRadius: borderRadiusLG,
@@ -187,6 +198,63 @@ export default function MainLayout() {
         >
           <Outlet />
         </Content>
+
+        {/*
+          Footer FIJO al borde inferior de la viewport (no del documento).
+          - `position: fixed` lo mantiene visible aunque el contenido scrollee.
+          - `left` cambia con el estado del Sider colapsado.
+          - El Content reserva `FOOTER_HEIGHT` de marginBottom para que la
+            última fila no quede tapada.
+        */}
+        <Footer
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: collapsed ? 80 : 200,
+            right: 0,
+            transition: "left 0.2s",
+            textAlign: "center",
+            background: colorBgContainer,
+            borderTop: "1px solid rgba(0,0,0,0.06)",
+            padding: "12px 24px",
+            color: "rgba(0,0,0,0.55)",
+            fontSize: 12,
+            zIndex: 9,
+            boxShadow: "0 -1px 4px rgba(0,0,0,0.04)",
+          }}
+        >
+          <Space
+            split={
+              <span style={{ color: "rgba(0,0,0,0.18)", margin: "0 4px" }}>·</span>
+            }
+            wrap
+            size={[32, 8]}
+            style={{ justifyContent: "center", width: "100%" }}
+          >
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Desarrollado por{" "}
+              <Text strong style={{ color: "#0d9488" }}>{BRAND_NAME}</Text>
+            </Text>
+            <Link
+              href={`https://wa.me/${SUPPORT_WHATSAPP_INTL}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: "rgba(0,0,0,0.55)", fontSize: 12 }}
+              aria-label="Soporte por WhatsApp"
+            >
+              <WhatsAppOutlined style={{ marginRight: 6, color: "#25d366" }} />
+              {SUPPORT_WHATSAPP_DISPLAY}
+            </Link>
+            <Link
+              href={`mailto:${SUPPORT_EMAIL}`}
+              style={{ color: "rgba(0,0,0,0.55)", fontSize: 12 }}
+              aria-label="Soporte por email"
+            >
+              <MailOutlined style={{ marginRight: 6, color: "#0d9488" }} />
+              {SUPPORT_EMAIL}
+            </Link>
+          </Space>
+        </Footer>
       </Layout>
     </Layout>
   );

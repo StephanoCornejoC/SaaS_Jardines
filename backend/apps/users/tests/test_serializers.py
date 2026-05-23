@@ -4,7 +4,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from rest_framework.test import APIRequestFactory
 
-from apps.users.factories import ProfesorFactory, UserFactory
+from apps.users.factories import UserFactory
 from apps.users.serializers import (
     ChangePasswordSerializer,
     UserCreateSerializer,
@@ -46,13 +46,13 @@ class TestUserCreateSerializer:
             "password": "StrongPass1234",
             "first_name": "Nuevo",
             "last_name": "Usuario",
-            "role": "PROFESOR",
+            "role": "ADMIN_JARDIN",
         }
         serializer = UserCreateSerializer(data=data, context={"request": request})
         assert serializer.is_valid(), serializer.errors
         user = serializer.save()
         assert user.check_password("StrongPass1234")
-        assert user.role == "PROFESOR"
+        assert user.role == "ADMIN_JARDIN"
 
     def test_password_too_short(self, tenant):
         admin = UserFactory(role="ADMIN_JARDIN")
@@ -62,14 +62,14 @@ class TestUserCreateSerializer:
             "password": "123",
             "first_name": "Short",
             "last_name": "Pass",
-            "role": "PROFESOR",
+            "role": "ADMIN_JARDIN",
         }
         serializer = UserCreateSerializer(data=data, context={"request": request})
         assert not serializer.is_valid()
         assert "password" in serializer.errors
 
     def test_duplicate_email(self, tenant):
-        existing = UserFactory(email="dup@test.com")
+        UserFactory(email="dup@test.com")
         admin = UserFactory(role="ADMIN_JARDIN")
         request = self._make_request(admin)
         data = {
@@ -77,16 +77,16 @@ class TestUserCreateSerializer:
             "password": "StrongPass1234",
             "first_name": "Dup",
             "last_name": "User",
-            "role": "PROFESOR",
+            "role": "ADMIN_JARDIN",
         }
         serializer = UserCreateSerializer(data=data, context={"request": request})
         assert not serializer.is_valid()
         assert "email" in serializer.errors
 
-    def test_role_escalation_prevention(self, tenant):
-        """A DIRECTOR cannot create a SUPERADMIN."""
-        director = UserFactory(role="DIRECTOR")
-        request = self._make_request(director)
+    def test_admin_jardin_cannot_create_superadmin(self, tenant):
+        """Un ADMIN_JARDIN no puede escalar privilegios creando un SUPERADMIN."""
+        admin = UserFactory(role="ADMIN_JARDIN")
+        request = self._make_request(admin)
         data = {
             "email": "escalate@test.com",
             "password": "StrongPass1234",
@@ -98,16 +98,16 @@ class TestUserCreateSerializer:
         assert not serializer.is_valid()
         assert "role" in serializer.errors
 
-    def test_admin_can_create_director(self, tenant):
-        """An ADMIN_JARDIN can create a DIRECTOR (lower in hierarchy)."""
-        admin = UserFactory(role="ADMIN_JARDIN")
-        request = self._make_request(admin)
+    def test_superadmin_can_create_admin_jardin(self, tenant):
+        """SUPERADMIN sí puede crear ADMIN_JARDIN (jerarquía bien aplicada)."""
+        superadmin = UserFactory(role="SUPERADMIN")
+        request = self._make_request(superadmin)
         data = {
-            "email": "newdir@test.com",
+            "email": "newadmin@test.com",
             "password": "StrongPass1234",
             "first_name": "New",
-            "last_name": "Director",
-            "role": "DIRECTOR",
+            "last_name": "Admin",
+            "role": "ADMIN_JARDIN",
         }
         serializer = UserCreateSerializer(data=data, context={"request": request})
         assert serializer.is_valid(), serializer.errors

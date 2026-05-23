@@ -2,12 +2,10 @@
 
 import pytest
 from datetime import date
-from decimal import Decimal
-from unittest.mock import patch
 
 from apps.payments.factories import MonthlyFeeFactory, PaymentFactory
 from apps.payments.models import Payment
-from apps.payments.services import generate_monthly_payments, generate_yape_qr
+from apps.payments.services import generate_monthly_payments
 from apps.students.factories import StudentFactory
 
 pytestmark = [pytest.mark.django_db, pytest.mark.unit]
@@ -61,40 +59,3 @@ class TestGenerateMonthlyPayments:
         assert payment.fecha_vencimiento == date(current_year, 6, 20)
 
 
-class TestGenerateYapeQR:
-    @patch("apps.payments.services.qrcode.QRCode")
-    def test_generates_qr_image(self, mock_qr_class, tenant):
-        """generate_yape_qr creates and saves a QR code image on the payment."""
-        from unittest.mock import MagicMock
-        import io
-
-        # Mock the QR generation
-        mock_qr = MagicMock()
-        mock_qr_class.return_value = mock_qr
-        mock_img = MagicMock()
-        mock_qr.make_image.return_value = mock_img
-        mock_img.save = MagicMock(side_effect=lambda buf, **kw: buf.write(b"PNG_DATA"))
-
-        payment = PaymentFactory()
-        url = generate_yape_qr(payment.student, payment)
-
-        assert url is not None
-        mock_qr.add_data.assert_called_once()
-        data_arg = mock_qr.add_data.call_args[0][0]
-        assert payment.student.nombres in data_arg
-        assert str(payment.monto) in data_arg
-
-    def test_qr_contains_student_info(self, tenant):
-        """The QR text includes student name, month, year, and amount."""
-        payment = PaymentFactory(mes=5, anio=2026, monto=Decimal("400.00"))
-        student = payment.student
-
-        # We check the QR text format without actually generating the image
-        expected_text = (
-            f"Pension {student.nombres} {student.apellidos} "
-            f"- 5/2026 "
-            f"- S/400.00"
-        )
-        # This validates the format used in the service
-        assert student.nombres in expected_text
-        assert "5/2026" in expected_text

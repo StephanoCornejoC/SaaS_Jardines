@@ -8,7 +8,18 @@ class CashCategory(models.Model):
         EGRESO = "EGRESO", "Egreso"
 
     nombre = models.CharField(max_length=100, verbose_name="Nombre")
-    tipo = models.CharField(max_length=7, choices=Tipo.choices, verbose_name="Tipo")
+    tipo = models.CharField(
+        max_length=7,
+        choices=Tipo.choices,
+        blank=True,
+        null=True,
+        verbose_name="Tipo",
+        help_text=(
+            "Si se especifica, la categoría solo aparece en transacciones de "
+            "ese tipo (INGRESO o EGRESO). Si se deja vacío, la categoría es "
+            "bidireccional — sirve para INGRESOS y EGRESOS (ej. 'Otros')."
+        ),
+    )
     es_sistema = models.BooleanField(
         default=False,
         verbose_name="Es categoría de sistema",
@@ -75,6 +86,34 @@ class CashTransaction(models.Model):
 
     def __str__(self):
         return f"{self.get_tipo_display()} - {self.descripcion} (S/{self.monto})"
+
+    def clean(self):
+        """Valida que el tipo de la transacción coincida con el tipo de
+        la categoría. Sin esto, alguien podría marcar tipo=INGRESO y
+        elegir categoría "Sueldos" (EGRESO), desconfigurando la caja:
+        el cierre mensual contaría el monto como ingreso pero la
+        categoría lo identificaría como gasto.
+
+        Excepción: si la categoría no tiene tipo definido (tipo=null,
+        bidireccional como "Otros"), sirve para cualquier transacción.
+
+        Esta validación cierra TODOS los entrypoints — admin, API,
+        ORM directo via full_clean.
+        """
+        super().clean()
+        if (
+            self.categoria_id
+            and self.categoria.tipo  # solo valida si la categoría tiene tipo
+            and self.categoria.tipo != self.tipo
+        ):
+            raise ValidationError({
+                "categoria": (
+                    f"La categoría '{self.categoria.nombre}' es de tipo "
+                    f"{self.categoria.get_tipo_display()}, pero la transacción "
+                    f"está marcada como {self.get_tipo_display()}. "
+                    f"Tipo y categoría deben coincidir."
+                )
+            })
 
 
 class MonthlyClosure(models.Model):

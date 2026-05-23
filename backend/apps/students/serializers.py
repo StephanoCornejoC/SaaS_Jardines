@@ -93,12 +93,13 @@ class StudentListSerializer(serializers.ModelSerializer):
         )
 
     def get_apoderado_principal(self, obj):
-        guardian = next(
-            (g for g in obj.apoderados.all() if g.es_principal),
-            obj.apoderados.all().first() if obj.apoderados.all() else None,
-        )
-        if not guardian:
+        # Materializa el prefetch_related una sola vez en lugar de evaluarlo
+        # 3 veces (.all() en filter, en if y en first()). Para 50 alumnos esto
+        # reduce ~150 evaluaciones de queryset a 50.
+        guardians = list(obj.apoderados.all())
+        if not guardians:
             return None
+        guardian = next((g for g in guardians if g.es_principal), guardians[0])
         return {
             "id": guardian.id,
             "nombres": guardian.nombres,

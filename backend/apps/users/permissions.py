@@ -25,14 +25,6 @@ class IsAdminJardinOrAbove(BasePermission):
         )
 
 
-class IsDirectorOrAbove(BasePermission):
-    """Permite acceso a SUPERADMIN, ADMIN_JARDIN y DIRECTOR."""
-
-    ALLOWED_ROLES = {"SUPERADMIN", "ADMIN_JARDIN", "DIRECTOR"}
-
-    def has_permission(self, request, view):
-        return (
-            request.user
-            and request.user.is_authenticated
-            and request.user.role in self.ALLOWED_ROLES
-        )
+# IsDirectorOrAbove fue removida tras el cleanup #55: el rol DIRECTOR ya
+# no existe en User.Role. Las views que necesiten "admin o más arriba"
+# deben usar `IsAdminJardinOrAbove` directamente.

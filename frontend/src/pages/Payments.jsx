@@ -22,7 +22,6 @@ import {
 import {
   SearchOutlined,
   DollarOutlined,
-  QrcodeOutlined,
   ArrowLeftOutlined,
   CheckCircleOutlined,
   ClockCircleOutlined,
@@ -66,7 +65,7 @@ export default function Payments() {
   const [payingPayment, setPayingPayment] = useState(null);
   const [saving, setSaving] = useState(false);
   const [payForm] = Form.useForm();
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
 
   const fetchStudents = useCallback(async () => {
     setLoadingList(true);
@@ -150,27 +149,6 @@ export default function Payments() {
       message.error(detail);
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleGenerateQR = async (payment) => {
-    try {
-      const res = await api.get(`/payments/${payment.id}/generar-qr/`, { responseType: "blob" });
-      const url = window.URL.createObjectURL(new Blob([res.data]));
-      modal.info({
-        title: `QR de pago — ${meses[payment.mes - 1]} ${payment.anio}`,
-        content: (
-          <div style={{ textAlign: "center" }}>
-            <img src={url} alt="QR" style={{ maxWidth: 280 }} />
-            <div style={{ marginTop: 8 }}>
-              <Text strong>S/. {Number(payment.monto).toFixed(2)}</Text>
-            </div>
-          </div>
-        ),
-        width: 360,
-      });
-    } catch {
-      message.error("Error al generar QR");
     }
   };
 
@@ -416,27 +394,18 @@ export default function Payments() {
                     {
                       title: "Acciones",
                       key: "acciones",
-                      width: 220,
+                      width: 160,
                       render: (_, p) => (
-                        <Space>
-                          {p.estado !== "PAGADO" && p.estado !== "EXONERADO" && (
-                            <Button
-                              type="primary"
-                              size="small"
-                              icon={<DollarOutlined />}
-                              onClick={() => openPayModal(p)}
-                            >
-                              Registrar
-                            </Button>
-                          )}
+                        p.estado !== "PAGADO" && p.estado !== "EXONERADO" ? (
                           <Button
+                            type="primary"
                             size="small"
-                            icon={<QrcodeOutlined />}
-                            onClick={() => handleGenerateQR(p)}
+                            icon={<DollarOutlined />}
+                            onClick={() => openPayModal(p)}
                           >
-                            QR
+                            Registrar pago
                           </Button>
-                        </Space>
+                        ) : null
                       ),
                     },
                   ]}

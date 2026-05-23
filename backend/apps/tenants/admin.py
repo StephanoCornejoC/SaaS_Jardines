@@ -1,7 +1,6 @@
 import re
 import secrets
 from datetime import date, timedelta
-from decimal import Decimal
 
 from django import forms
 from django.conf import settings
@@ -14,36 +13,25 @@ from django.utils.html import format_html
 from django_tenants.utils import schema_context
 
 from apps.platform.models import Plan, TenantSubscription
+from apps.platform.services import emitir_cobro_ahora
 from apps.users.models import User
 
 from .models import Domain, Tenant
 
 
+# Subdominio base por defecto (configurable por env)
 BASE_DOMAIN = getattr(settings, "TENANT_BASE_DOMAIN", "corem.pe")
-PRECIO_DEFAULT = Decimal("120.00")
-TRIAL_DEFAULT = 30
 
 
 def _slug(value):
+    """Genera un schema_name seguro a partir del nombre del jardín."""
     s = re.sub(r"[^a-z0-9]+", "", value.lower())
     return s[:30] or "jardin"
 
 
-def _contar_alumnos(schema_name):
-    """Cuenta alumnos activos del tenant de forma segura."""
-    try:
-        with schema_context(schema_name):
-            from apps.students.models import Student
-            return Student.objects.filter(estado="ACTIVO").count()
-    except Exception:
-        return "—"
-
-
-# ============================================================================
-# Formulario: Crear nuevo jardín
-# ============================================================================
-
 class CrearJardinForm(forms.Form):
+    """Formulario de alta de jardín nuevo desde el admin."""
+
     nombre = forms.CharField(
         label="Nombre del jardín",
         max_length=255,
@@ -60,29 +48,6 @@ class CrearJardinForm(forms.Form):
     direccion = forms.CharField(
         label="Dirección", required=False, widget=forms.Textarea(attrs={"rows": 2})
     )
-    precio_mensual = forms.DecimalField(
-        label="Precio mensual (S/.)",
-        max_digits=10,
-        decimal_places=2,
-        initial=PRECIO_DEFAULT,
-        min_value=Decimal("50.00"),
-        max_value=Decimal("500.00"),
-        help_text="Precio personalizado para este jardín. Default: S/. 120.00",
-    )
-    dias_trial = forms.IntegerField(
-        label="Días de trial",
-        initial=TRIAL_DEFAULT,
-        min_value=0,
-        max_value=180,
-        help_text="Días sin cobro desde el alta. Default: 30. Pon 0 para cobrar desde el inicio.",
-    )
-    dia_cobro = forms.IntegerField(
-        label="Día de cobro mensual",
-        initial=1,
-        min_value=1,
-        max_value=28,
-        help_text="Día del mes en que se emitirá el cobro recurrente (1-28). Default: 01.",
-    )
     schema_name = forms.SlugField(
         label="Schema (técnico)",
         help_text="Identificador único en BD. Solo letras/números. Default = nombre normalizado.",
@@ -90,7 +55,7 @@ class CrearJardinForm(forms.Form):
     )
     dominio = forms.CharField(
         label="Dominio",
-        help_text=f"Default: <nombre>.{BASE_DOMAIN}. Edita si el jardín tiene dominio propio.",
+        help_text=f"Default: <nombre>.{BASE_DOMAIN}. Puedes editarlo si el jardín tiene su propio dominio.",
         required=False,
     )
 
@@ -101,6 +66,7 @@ class CrearJardinForm(forms.Form):
             data["schema_name"] = _slug(nombre)
         if not data.get("dominio") and data.get("schema_name"):
             data["dominio"] = f"{data['schema_name']}.{BASE_DOMAIN}"
+        # Validaciones de unicidad
         if data.get("schema_name") and Tenant.objects.filter(schema_name=data["schema_name"]).exists():
             self.add_error("schema_name", "Ya existe un jardín con ese schema.")
         if data.get("dominio") and Domain.objects.filter(domain=data["dominio"]).exists():
@@ -110,27 +76,37 @@ class CrearJardinForm(forms.Form):
         return data
 
 
-# ============================================================================
-# TenantAdmin
-# ============================================================================
-
 @admin.register(Tenant)
 class TenantAdmin(ModelAdmin):
     list_display = (
         "nombre",
         "schema_name",
         "ruc",
-        "alumnos_activos",
         "estado_subscription",
-        "dias_info",
-        "activo",
         "operar_link",
+        "cobro_ahora_link",
+        "activo",
+        "created_at",
     )
-    list_filter = ("activo",)
+    list_filter = ()
     search_fields = ("nombre", "ruc", "schema_name", "email")
     readonly_fields = ("schema_name", "created_at", "updated_at")
     ordering = ("nombre",)
     change_list_template = "admin/tenants/tenant/change_list.html"
+
+    def get_queryset(self, request):
+        # Excluimos los schemas técnicos (public/info) del changelist —
+        # no son jardines clientes, no se pueden operar, y aparecer
+        # confunde al SuperAdmin.
+        qs = super().get_queryset(request)
+        return qs.exclude(schema_name__in=("public", "info"))
+
+    def has_add_permission(self, request):
+        # Deshabilita el "Add" default del admin: el alta de un Tenant
+        # requiere validaciones especiales (schema_name, dominio, director,
+        # suscripción) que solo se hacen vía CrearJardinForm. El botón
+        # custom "+ Crear nuevo jardín" del change_list ya lleva ahí.
+        return False
 
     def get_urls(self):
         urls = super().get_urls()
@@ -140,88 +116,84 @@ class TenantAdmin(ModelAdmin):
                 self.admin_site.admin_view(self.crear_jardin_view),
                 name="tenants_tenant_crear_jardin",
             ),
+            path(
+                "<int:tenant_id>/emitir-cobro/",
+                self.admin_site.admin_view(self.emitir_cobro_view),
+                name="tenants_tenant_emitir_cobro",
+            ),
         ]
         return custom + urls
 
-    # ------------------------------------------------------------------
-    # Columnas calculadas
-    # ------------------------------------------------------------------
-
-    @admin.display(description="Alumnos")
-    def alumnos_activos(self, obj):
-        if obj.schema_name in ("public", "info"):
-            return "—"
-        n = _contar_alumnos(obj.schema_name)
-        return format_html(
-            '<span style="font-weight:700;color:#0d9488">{}</span>', n
-        )
-
-    @admin.display(description="Estado")
+    @admin.display(description="Suscripción")
     def estado_subscription(self, obj):
         sub = getattr(obj, "suscripcion", None)
         if not sub:
-            return format_html(
-                '<span style="color:#94a3b8;font-size:11px">Sin suscripción</span>'
-            )
+            return format_html('<span style="color:#94a3b8">Sin suscripción</span>')
         colors = {
-            "TRIAL":     "#3b82f6",
-            "ACTIVA":    "#10b981",
-            "MOROSA":    "#f59e0b",
+            "TRIAL": "#3b82f6",
+            "ACTIVA": "#10b981",
+            "MOROSA": "#f59e0b",
             "BLOQUEADA": "#ef4444",
             "CANCELADA": "#6b7280",
         }
         c = colors.get(sub.estado, "#6b7280")
         return format_html(
-            '<span style="background:{};color:#fff;padding:2px 9px;border-radius:4px;'
-            'font-size:11px;font-weight:600">{}</span>',
+            '<span style="background:{};color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">{}</span>',
             c, sub.get_estado_display(),
         )
 
-    @admin.display(description="Vencimiento")
-    def dias_info(self, obj):
+    @admin.display(description="Cobro")
+    def cobro_ahora_link(self, obj):
         sub = getattr(obj, "suscripcion", None)
-        if not sub:
+        if not sub or sub.estado in (
+            TenantSubscription.Estado.CANCELADA,
+            TenantSubscription.Estado.TRIAL,
+        ):
             return "—"
-        hoy = date.today()
-        if sub.estado == "TRIAL" and sub.trial_hasta:
-            delta = (sub.trial_hasta - hoy).days
-            if delta < 0:
-                return format_html('<span style="color:#ef4444;font-weight:600">Trial vencido</span>')
-            return format_html(
-                '<span style="color:#3b82f6">Trial: {} días</span>', delta
-            )
-        from apps.platform.models import PlatformInvoice
-        ultima = (
-            PlatformInvoice.objects.filter(
-                tenant=obj, estado=PlatformInvoice.Estado.PENDIENTE
-            )
-            .order_by("-fecha_vencimiento")
-            .first()
-        )
-        if not ultima:
-            return format_html('<span style="color:#10b981">Al día ✓</span>')
-        delta = (hoy - ultima.fecha_vencimiento).days
-        if delta > 0:
-            color = "#ef4444" if delta >= 7 else "#f59e0b"
-            return format_html(
-                '<span style="color:{};font-weight:600">{} días vencida</span>', color, delta
-            )
+        url = reverse("admin:tenants_tenant_emitir_cobro", args=[obj.id])
         return format_html(
-            '<span style="color:#64748b">Vence en {} días</span>', abs(delta)
+            '<a href="{}" class="button" style="padding:4px 10px;background:#f59e0b;color:white;border-radius:4px;text-decoration:none;font-size:11px">Emitir cobro</a>',
+            url,
         )
 
-    @admin.display(description="Panel")
+    def emitir_cobro_view(self, request, tenant_id):
+        if request.method != "POST":
+            tenant = Tenant.objects.filter(id=tenant_id).first()
+            if not tenant:
+                messages.error(request, "Jardín no encontrado.")
+                return redirect("admin:tenants_tenant_changelist")
+            return render(
+                request,
+                "admin/tenants/tenant/emitir_cobro_confirm.html",
+                {
+                    **self.admin_site.each_context(request),
+                    "tenant": tenant,
+                    "opts": self.model._meta,
+                    "title": f"Emitir cobro — {tenant.nombre}",
+                },
+            )
+        tenant = Tenant.objects.filter(id=tenant_id).first()
+        if not tenant:
+            messages.error(request, "Jardín no encontrado.")
+            return redirect("admin:tenants_tenant_changelist")
+        invoice, was_created, msg = emitir_cobro_ahora(tenant)
+        if invoice:
+            (messages.success if was_created else messages.info)(request, f"{tenant.nombre}: {msg}")
+        else:
+            messages.warning(request, f"{tenant.nombre}: {msg}")
+        return redirect("admin:tenants_tenant_changelist")
+
+    @admin.display(description="Operar")
     def operar_link(self, obj):
-        if obj.schema_name in ("public", "info"):
-            return "—"
-        url = reverse("admin:jardin_dashboard", args=[obj.schema_name])
+        # Apunta al modo Operar Jardín del CoremAdminSite: /admin/op/<schema>/.
+        # Esa URL setea la sesión + redirige a /admin/ con el sidebar y
+        # modelos del jardín seleccionado (Gestión escolar / Finanzas / etc).
+        # No usar /admin/jardin/<schema>/ — ese URL pattern viejo se eliminó.
+        url = f"/admin/op/{obj.schema_name}/"
         return format_html(
-            '<a href="{}" class="corem-operar-btn">Entrar →</a>', url
+            '<a href="{}" class="button" style="padding:4px 10px;background:#0d9488;color:white;border-radius:4px;text-decoration:none;font-size:11px">Operar ↗</a>',
+            url,
         )
-
-    # ------------------------------------------------------------------
-    # Vista: Crear nuevo jardín
-    # ------------------------------------------------------------------
 
     def crear_jardin_view(self, request):
         if request.method == "POST":
@@ -234,8 +206,7 @@ class TenantAdmin(ModelAdmin):
                 else:
                     messages.success(
                         request,
-                        f"Jardín '{tenant.nombre}' creado. "
-                        f"Credenciales enviadas a {form.cleaned_data['email_director']}.",
+                        f"Jardín '{tenant.nombre}' creado. La contraseña inicial se envió a {form.cleaned_data['email_director']}.",
                     )
                     return redirect("admin:tenants_tenant_changelist")
         else:
@@ -251,6 +222,7 @@ class TenantAdmin(ModelAdmin):
 
     @transaction.atomic
     def _crear_jardin(self, data, creador):
+        # 1. Crear tenant + schema
         tenant = Tenant.objects.create(
             schema_name=data["schema_name"],
             nombre=data["nombre"],
@@ -260,30 +232,23 @@ class TenantAdmin(ModelAdmin):
             direccion=data.get("direccion") or "",
             activo=True,
         )
-        Domain.objects.create(domain=data["dominio"], tenant=tenant, is_primary=True)
-
+        # 2. Crear dominio
+        Domain.objects.create(
+            domain=data["dominio"], tenant=tenant, is_primary=True
+        )
+        # 3. Crear suscripción con trial 1 mes
         plan = Plan.vigente()
         if not plan:
-            plan = Plan.objects.create(nombre="Plan COREM", precio_mensual=PRECIO_DEFAULT, activo=True)
-
-        precio = data.get("precio_mensual") or plan.precio_mensual
-        dias = int(data.get("dias_trial") or 0)
-        hoy = date.today()
-        trial_hasta = hoy + timedelta(days=dias) if dias > 0 else hoy
-        estado_inicial = (
-            TenantSubscription.Estado.TRIAL if dias > 0 else TenantSubscription.Estado.ACTIVA
-        )
-
+            plan = Plan.objects.create(nombre="Plan COREM", precio_mensual="120.00", activo=True)
         TenantSubscription.objects.create(
             tenant=tenant,
             plan=plan,
-            precio_acordado=precio,
-            fecha_alta=hoy,
-            trial_hasta=trial_hasta,
-            dia_cobro=int(data.get("dia_cobro") or 1),
-            estado=estado_inicial,
+            precio_acordado=plan.precio_mensual,
+            fecha_alta=date.today(),
+            trial_hasta=date.today() + timedelta(days=30),
+            estado=TenantSubscription.Estado.TRIAL,
         )
-
+        # 4. Crear usuario admin del jardín + categorías sistema en su schema
         password = secrets.token_urlsafe(10)
         with schema_context(tenant.schema_name):
             user = User.objects.create_user(
@@ -297,6 +262,13 @@ class TenantAdmin(ModelAdmin):
             user.role = "ADMIN_JARDIN"
             user.save()
 
+            # Pre-crear las 4 categorías sistema (Pensiones/Otros INGRESO +
+            # Sueldos/Otros EGRESO) para que aparezcan en el selector de
+            # Caja desde el día 1, sin esperar al primer pago real.
+            from apps.cashflow.services import ensure_categorias_sistema
+            ensure_categorias_sistema()
+
+        # 5. Enviar credenciales por email
         try:
             from django.core.mail import send_mail
             send_mail(
@@ -320,13 +292,9 @@ class TenantAdmin(ModelAdmin):
         return tenant
 
 
-# ============================================================================
-# DomainAdmin
-# ============================================================================
-
 @admin.register(Domain)
 class DomainAdmin(ModelAdmin):
     list_display = ("domain", "tenant", "is_primary")
-    list_filter = ("is_primary",)
+    list_filter = ()
     search_fields = ("domain", "tenant__nombre")
     autocomplete_fields = ("tenant",)

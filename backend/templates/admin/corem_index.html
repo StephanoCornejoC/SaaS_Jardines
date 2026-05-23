@@ -1,0 +1,320 @@
+{% extends "admin/index.html" %}
+{% load i18n static %}
+
+{% comment %}
+Index del CoremAdminSite — admin Kiddo (SaaS de jardines).
+
+Solo se renderiza la parte custom cuando NO estamos en modo Operar Jardín
+— dentro de un tenant queremos el index nativo de Django.
+
+Secciones (top → bottom):
+  1. KPI bar (4 indicadores clave del SaaS)
+  2. Banner de alertas (solo si hay)
+  3. Search de jardines
+  4. Grid de jardines (ordenado: bloqueados/morosos arriba)
+  5. App list (pilares Jardines / Suscripciones / Costos / Sistema)
+{% endcomment %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+  /* ===== Ocultar sidebar de "Acciones recientes" ===== */
+  /* Pedido de Stephano: no se usa el widget de últimos cambios. Sacamos
+     todo el panel derecho (#content-related) y dejamos que #content ocupe
+     el ancho completo. Aplica al index del admin Kiddo y al modo Operar. */
+  #content-related { display: none !important; }
+  #content-main { margin-right: 0 !important; width: 100%; }
+  #content.colMS { margin-right: 0 !important; }
+
+  /* ===== KPI BAR ===== */
+  .kiddo-kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .kpi-card {
+    background: var(--body-bg, #fff);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-left: 4px solid #0d9488;
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+  .kpi-card.kpi-warning { border-left-color: #f59e0b; }
+  .kpi-card.kpi-danger  { border-left-color: #ef4444; }
+  .kpi-card.kpi-cost    { border-left-color: #6366f1; }
+  .kpi-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--body-quiet-color, #666);
+    margin-bottom: 6px;
+    font-weight: 600;
+  }
+  .kpi-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--body-fg, #1a1a1a);
+    line-height: 1.1;
+  }
+  .kpi-value.danger { color: #ef4444; }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--body-quiet-color, #888);
+    margin-top: 4px;
+  }
+
+  /* ===== ALERTAS ===== */
+  .kiddo-alertas {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .alerta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .alerta-critico { background: #fee2e2; color: #991b1b; border-left: 3px solid #ef4444; }
+  .alerta-warning { background: #fef3c7; color: #92400e; border-left: 3px solid #f59e0b; }
+  .alerta-info    { background: #dbeafe; color: #1e40af; border-left: 3px solid #3b82f6; }
+  .alerta .icono {
+    font-weight: 900;
+    font-size: 14px;
+  }
+
+  /* ===== SEARCH ===== */
+  .kiddo-toolbar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+  .kiddo-search {
+    flex: 1;
+    max-width: 420px;
+    padding: 9px 14px;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--darkened-bg, #fff);
+    color: var(--body-fg, #333);
+  }
+  .kiddo-search:focus {
+    outline: none;
+    border-color: #0d9488;
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.15);
+  }
+  .kiddo-search-stats {
+    color: var(--body-quiet-color, #666);
+    font-size: 13px;
+  }
+
+  /* ===== SECCIONES ===== */
+  .kiddo-section {
+    background: var(--body-bg, #fff);
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 4px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+  }
+  .kiddo-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .kiddo-section h2 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--body-quiet-color, #666);
+    background: transparent;
+    padding: 0;
+    border: none;
+  }
+  .kiddo-section-cta {
+    display: inline-block;
+    padding: 6px 12px;
+    background: #0d9488;
+    color: #fff !important;
+    border-radius: 4px;
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .kiddo-section-cta:hover { background: #0f766e; text-decoration: none; }
+
+  /* ===== CARDS — jardines ===== */
+  .kiddo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+  }
+  .jardin-card {
+    background: var(--darkened-bg, #f9f9f9);
+    border: 1px solid var(--border-color, #e5e5e5);
+    border-radius: 4px;
+    padding: 14px;
+    transition: border-color 0.15s, transform 0.15s;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-decoration: none;
+    color: inherit;
+  }
+  .jardin-card:hover {
+    border-color: #0d9488;
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+  .card-nombre {
+    font-weight: 600;
+    font-size: 15px;
+    color: var(--link-fg, #0c4b33);
+  }
+  .card-meta {
+    color: var(--body-quiet-color, #666);
+    font-size: 12px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    align-self: flex-start;
+  }
+  .b-trial     { background: #3b82f6; }
+  .b-activa    { background: #10b981; }
+  .b-morosa    { background: #f59e0b; }
+  .b-bloqueada { background: #ef4444; }
+  .b-cancelada { background: #6b7280; }
+  .b-sinsub    { background: #94a3b8; }
+
+  .kiddo-empty {
+    color: var(--body-quiet-color, #888);
+    font-style: italic;
+    text-align: center;
+    padding: 24px;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+
+  {% if not in_tenant_mode %}
+
+  {# ===== KPI BAR ===== #}
+  <div class="kiddo-kpis">
+    <div class="kpi-card">
+      <div class="kpi-label">Jardines activos</div>
+      <div class="kpi-value">{{ kpi_jardines_activos }} <span style="font-size:14px;color:#888;font-weight:400">de {{ kpi_jardines_total }}</span></div>
+      <div class="kpi-sub">Clientes de Kiddo</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">MRR del mes</div>
+      <div class="kpi-value">S/ {{ kpi_mrr_mes|floatformat:0 }}</div>
+      <div class="kpi-sub">Suma de suscripciones activas</div>
+    </div>
+    <div class="kpi-card {% if kpi_morosos %}kpi-danger{% endif %}">
+      <div class="kpi-label">Morosos</div>
+      <div class="kpi-value {% if kpi_morosos %}danger{% endif %}">{{ kpi_morosos }}</div>
+      <div class="kpi-sub">{% if kpi_morosos %}requieren acción{% else %}sin alertas{% endif %}</div>
+    </div>
+    <div class="kpi-card kpi-cost">
+      <div class="kpi-label">Costos del SaaS</div>
+      <div class="kpi-value">S/ {{ kpi_costos_mes|floatformat:0 }}</div>
+      <div class="kpi-sub">Acumulado del mes</div>
+    </div>
+  </div>
+
+  {# ===== ALERTAS ===== #}
+  {% if alertas %}
+  <div class="kiddo-alertas">
+    {% for a in alertas %}
+    <div class="alerta alerta-{{ a.tono }}">
+      <span class="icono">{{ a.icono }}</span>
+      <span>{{ a.texto }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {# ===== JARDINES ===== #}
+  <div class="kiddo-section">
+    <div class="kiddo-section-header">
+      <h2>{% translate "Jardines · Saltar a operación" %}</h2>
+      <a class="kiddo-section-cta" href="{% url 'admin:tenants_tenant_crear_jardin' %}">
+        + Crear nuevo jardín
+      </a>
+    </div>
+
+    {% if tenants %}
+    <div class="kiddo-toolbar">
+      <input type="search" id="kiddo-search" class="kiddo-search"
+             placeholder="Buscar jardín por nombre, RUC o schema..."
+             autocomplete="off">
+      <span class="kiddo-search-stats">
+        <span id="kiddo-visible">{{ tenants|length }}</span> de {{ tenants|length }} jardines
+      </span>
+    </div>
+
+    <div id="jardines-grid" class="kiddo-grid">
+      {% for t in tenants %}
+        <a class="jardin-card kiddo-filterable"
+           data-needle="{{ t.search_needle }}"
+           href="/admin/op/{{ t.schema_name }}/">
+          <div class="card-nombre">{{ t.nombre }}</div>
+          <div class="card-meta">{{ t.schema_name }} · {{ t.ruc|default:"sin RUC" }}</div>
+          {% if t.estado %}
+            <span class="badge b-{{ t.estado|lower }}">{{ t.get_estado_display }}</span>
+          {% else %}
+            <span class="badge b-sinsub">Sin suscripción</span>
+          {% endif %}
+        </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="kiddo-empty">
+      Aún no hay jardines registrados. Click en "+ Crear nuevo jardín" para empezar.
+    </div>
+    {% endif %}
+  </div>
+
+  {% endif %}
+
+  {# App list: pilares Jardines/Suscripciones/Costos/Sistema (modo Kiddo) o modelos del jardín (modo Operar) #}
+  {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+</div>
+
+<script>
+(function () {
+  var input = document.getElementById('kiddo-search');
+  var counter = document.getElementById('kiddo-visible');
+  if (!input) return;
+  var cards = document.querySelectorAll('.kiddo-filterable');
+  input.addEventListener('input', function () {
+    var q = (input.value || '').toLowerCase().trim();
+    var visible = 0;
+    cards.forEach(function (card) {
+      var needle = card.getAttribute('data-needle') || '';
+      var match = !q || needle.indexOf(q) !== -1;
+      card.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    if (counter) counter.textContent = visible;
+  });
+})();
+</script>
+{% endblock %}
