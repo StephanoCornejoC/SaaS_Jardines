@@ -64,8 +64,21 @@ CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").sp
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp-relay.brevo.com")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+
+# Timeout corto del SMTP: si Brevo no responde en 10s, fallar rapido en
+# vez de colgar el request 5+ minutos (TCP timeout default). Critico para
+# el flow de "crear jardin" que hace send_mail al final.
+EMAIL_TIMEOUT = 10
+
+# Si las credenciales SMTP NO estan seteadas, switch a console backend
+# (imprime el email al log en vez de intentar enviarlo). Util durante el
+# deploy inicial cuando Brevo todavia no esta configurado (D6 todavia
+# pendiente). Sin esto, send_mail() se cuelga esperando TCP handshake al
+# servidor SMTP con credenciales vacias y mata al gunicorn worker.
+if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # ------- Sentry (D8) -------
 # Solo inicializa si SENTRY_DSN está seteado. Mientras no exista la cuenta
