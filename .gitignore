@@ -21,11 +21,11 @@ env/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-**/media/
-**/staticfiles/
-**/static_collected/
-backend/staticfiles/
+/media/
+/staticfiles/
+/static_collected/
 backend/media/
+backend/staticfiles/
 
 # Node
 node_modules/
@@ -89,3 +89,10 @@ coverage.xml
 *.bak
 *.tmp
 *.temp
+
+# Claude Code local config
+.claude/
+
+# Word temp / preview files
+~$*.docx
+VISTA_PREVIA.docx
