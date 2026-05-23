@@ -5,7 +5,8 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "startCommand": "echo '=== STEP 1: migrate_schemas --shared ===' && python -u manage.py migrate_schemas --shared && echo '=== STEP 2: createcachetable ===' && python -u manage.py createcachetable && echo '=== STEP 3: ensure_superuser ===' && python -u manage.py ensure_superuser && echo '=== STEP 4: starting gunicorn ===' && exec python -u -m gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile - --log-level info",
+    "preDeployCommand": "python -u manage.py migrate_schemas --shared && python -u manage.py createcachetable && python -u manage.py ensure_superuser",
+    "startCommand": "exec python -u -m gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile - --log-level info",
     "healthcheckPath": "/health/",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
