@@ -18,3 +18,7 @@ openpyxl>=3.1,<4.0
 python-bidi<0.5
 xhtml2pdf>=0.2.16,<0.3
 sentry-sdk[django]>=2.0,<3.0
+# Email backend que usa la API HTTP de Resend en vez de SMTP. Critico para
+# Railway/Heroku/cloud providers que bloquean SMTP outbound (puerto 587).
+# Se configura via EMAIL_BACKEND + ANYMAIL settings en config/settings/prod.py.
+django-anymail[resend]>=11.0,<13.0

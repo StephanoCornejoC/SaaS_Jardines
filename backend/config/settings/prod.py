@@ -60,24 +60,33 @@ SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o]
 
-# Email - SMTP (Brevo por defecto en prod, configurable via env)
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp-relay.brevo.com")
-EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
-EMAIL_USE_TLS = True
+# Email backend selection (en orden de preferencia):
+#
+# 1. RESEND_API_KEY seteada -> usa anymail.backends.resend (API HTTP).
+#    Esta es la opcion correcta para Railway/Heroku/cloud providers que
+#    bloquean SMTP outbound. La API HTTP nunca esta bloqueada.
+#
+# 2. EMAIL_HOST_USER + EMAIL_HOST_PASSWORD seteados -> SMTP standard.
+#    Solo funciona si el provider permite SMTP outbound al puerto 587.
+#    En Railway no funciona porque bloquean el socket (TimeoutError).
+#
+# 3. Ninguna credencial -> console backend (imprime al log). Util en
+#    primer deploy antes de configurar credenciales.
+
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_TIMEOUT = 10  # segundos; corto para fallar rapido en SMTP
 
-# Timeout corto del SMTP: si Brevo no responde en 10s, fallar rapido en
-# vez de colgar el request 5+ minutos (TCP timeout default). Critico para
-# el flow de "crear jardin" que hace send_mail al final.
-EMAIL_TIMEOUT = 10
-
-# Si las credenciales SMTP NO estan seteadas, switch a console backend
-# (imprime el email al log en vez de intentar enviarlo). Util durante el
-# deploy inicial cuando Brevo todavia no esta configurado (D6 todavia
-# pendiente). Sin esto, send_mail() se cuelga esperando TCP handshake al
-# servidor SMTP con credenciales vacias y mata al gunicorn worker.
-if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
+if RESEND_API_KEY:
+    EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+    ANYMAIL = {"RESEND_API_KEY": RESEND_API_KEY}
+elif EMAIL_HOST_USER and EMAIL_HOST_PASSWORD:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp-relay.brevo.com")
+    EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
+    EMAIL_USE_TLS = True
+else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # ------- Sentry (D8) -------
