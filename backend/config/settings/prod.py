@@ -54,9 +54,29 @@ SECURE_HSTS_PRELOAD = True
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o]
 
-# Email - SMTP
-EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+# Email - SMTP (Brevo por defecto en prod, configurable via env)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp-relay.brevo.com")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 587))
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD")
+
+# ------- Sentry (D8) -------
+# Solo inicializa si SENTRY_DSN está seteado. Mientras no exista la cuenta
+# Sentry, el sistema funciona sin error reporting (lo cual es OK para arrancar).
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "").strip()
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=os.environ.get("SENTRY_ENVIRONMENT", "production"),
+        integrations=[DjangoIntegration()],
+        # 10% sampling para performance monitoring (free tier tope: 10K txns/mes)
+        traces_sample_rate=0.1,
+        # NO mandar PII (cumplimos privacy con apoderados/menores)
+        send_default_pii=False,
+        # Tag de release con SHA de commit (Railway lo expone como env var)
+        release=os.environ.get("RAILWAY_GIT_COMMIT_SHA", "unknown"),
+    )

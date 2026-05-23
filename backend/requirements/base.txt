@@ -17,3 +17,4 @@ openpyxl>=3.1,<4.0
 # prebuilt Windows wheel). 0.4.x has wheels and works with xhtml2pdf 0.2.16.
 python-bidi<0.5
 xhtml2pdf>=0.2.16,<0.3
+sentry-sdk[django]>=2.0,<3.0
