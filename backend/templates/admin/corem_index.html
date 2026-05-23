@@ -296,6 +296,29 @@ Secciones (top → bottom):
 
   {# App list: pilares Jardines/Suscripciones/Costos/Sistema (modo Kiddo) o modelos del jardín (modo Operar) #}
   {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
+
+  {% if not in_tenant_mode and request.user.is_superuser %}
+  {# Operaciones del sistema — SOLO SuperAdmin. Boton manual del cron diario.
+     Util para testing y para forzar ejecucion si falla el cron de GitHub Actions. #}
+  <div class="kiddo-section" style="margin-top: 16px;">
+    <div class="kiddo-section-header">
+      <h2>Operaciones del sistema</h2>
+    </div>
+    <p style="margin: 0 0 12px 0; color: var(--body-quiet-color, #666); font-size: 13px;">
+      Ejecuta el cron diario manualmente. Este job procesa trials, emite cobros,
+      revisa morosidad y envía recordatorios. Es idempotente — correrlo dos veces
+      el mismo día no duplica nada. Lo automatiza GitHub Actions a las 8 AM Lima.
+    </p>
+    <form method="post" action="{% url 'cron_daily_manual' %}" style="display: inline;"
+          onsubmit="return confirm('¿Ejecutar las tareas diarias ahora? Esto puede tardar 30-60 segundos.');">
+      {% csrf_token %}
+      <button type="submit" class="kiddo-section-cta"
+              style="border: none; cursor: pointer; font-family: inherit;">
+        Ejecutar tareas diarias ahora
+      </button>
+    </form>
+  </div>
+  {% endif %}
 </div>
 
 <script>

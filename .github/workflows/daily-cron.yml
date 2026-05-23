@@ -1,0 +1,64 @@
+name: Daily SaaS Cron
+
+# Dispara el management command `daily_saas_run` del backend via HTTP POST.
+#
+# Por que GitHub Actions y no Railway cron:
+# - Railway cron cobra extra ($).
+# - GitHub Actions tiene 2,000 minutos/mes gratis para repos privados.
+# - Este job tarda ~30-60s, asi que consume <1 min/dia = <30 min/mes.
+#
+# Schedule:
+#   '0 13 * * *' = 13:00 UTC = 8:00 AM Lima (UTC-5, sin DST en Peru).
+#
+# Manual trigger:
+#   `workflow_dispatch` permite disparar desde la UI de GitHub
+#   (Actions tab > Daily SaaS Cron > Run workflow). Util para test inicial.
+#
+# Secret requerido en el repo:
+#   CRON_SECRET_TOKEN  (mismo valor que la env var de Railway).
+#   Settearlo en: Settings -> Secrets and variables -> Actions -> New repo secret.
+
+on:
+  schedule:
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+
+jobs:
+  trigger_cron:
+    name: Trigger daily_saas_run via HTTP
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: POST a /api/v1/cron/daily/
+        env:
+          CRON_SECRET_TOKEN: ${{ secrets.CRON_SECRET_TOKEN }}
+          BACKEND_URL: https://miniddo.com
+        run: |
+          set -euo pipefail
+
+          echo "=== POST $BACKEND_URL/api/v1/cron/daily/ ==="
+
+          # -w '\nHTTP_STATUS:%{http_code}' agrega el status code en una linea
+          # nueva al final, asi podemos parsearlo aunque el body sea JSON.
+          response=$(curl -sS -w '\nHTTP_STATUS:%{http_code}' \
+            --max-time 600 \
+            -X POST "$BACKEND_URL/api/v1/cron/daily/" \
+            -H "Authorization: Bearer $CRON_SECRET_TOKEN" \
+            -H "Content-Type: application/json")
+
+          # Separar el body del status code
+          http_status=$(echo "$response" | tail -n1 | cut -d':' -f2)
+          body=$(echo "$response" | sed '$d')
+
+          echo "=== HTTP Status: $http_status ==="
+          echo "=== Response body ==="
+          echo "$body"
+
+          # Salir con error si el status no es 200
+          if [ "$http_status" -ne 200 ]; then
+            echo "::error::Daily cron failed with HTTP status $http_status"
+            exit 1
+          fi
+
+          echo "::notice::Daily cron triggered successfully"
