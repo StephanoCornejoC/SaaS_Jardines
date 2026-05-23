@@ -45,6 +45,12 @@ CACHES = {
 # Security hardening
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_SSL_REDIRECT = True
+# Eximir /health/ del redirect HTTP->HTTPS. El healthcheck de Railway pingea
+# por la red interna (100.64.x.x) sin pasar por el proxy que setea
+# X-Forwarded-Proto, asi que Django lo ve como HTTP y redirige con 301.
+# Railway espera 2xx, no 3xx, por eso el healthcheck falla. Exentando este
+# path puntual el resto sigue forzando HTTPS.
+SECURE_REDIRECT_EXEMPT = [r"^health/?$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 X_FRAME_OPTIONS = "DENY"
