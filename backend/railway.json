@@ -6,7 +6,7 @@
   },
   "deploy": {
     "preDeployCommand": "python -u manage.py migrate_schemas --shared && python -u manage.py createcachetable && python -u manage.py ensure_superuser",
-    "startCommand": "exec python -u -m gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile - --log-level info",
+    "startCommand": "python -u -m gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120 --access-logfile - --error-logfile - --log-level info",
     "healthcheckPath": "/health/",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
