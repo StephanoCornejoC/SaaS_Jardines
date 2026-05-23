@@ -11,8 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements/prod.txt requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+# Copiar el directorio requirements/ completo (prod.txt referencia base.txt
+# con `-r base.txt`, ambos archivos deben estar presentes para que pip resuelva)
+COPY requirements/ requirements/
+RUN pip install --no-cache-dir -r requirements/prod.txt
 
 COPY . .
 
