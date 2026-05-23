@@ -1,12 +1,18 @@
 """URL configuration for tenant schemas."""
 from django.contrib import admin
 from django.urls import path, include
+from django.views.generic import RedirectView
 
 from apps.platform.views import admin_dashboard
 from config.admin_views import enter_tenant_mode_view, exit_tenant_mode_view
 from shared.views import protected_media
 
 urlpatterns = [
+    # Tenant apex redirect: si un apoderado entra a `garabato.miniddo.com/`
+    # lo mandamos al admin del jardin. Cuando el frontend React este live
+    # (D9), este redirect debe ir hacia `https://app.miniddo.com/<tenant>`
+    # o similar, segun decidamos el routing del SPA.
+    path("", RedirectView.as_view(url="/admin/", permanent=False)),
     # Dashboard del SUPERADMIN (debe ir ANTES de admin.site.urls)
     path("admin/dashboard/", admin_dashboard, name="platform_dashboard"),
     # Modo "Operar jardín": entra/sale (toggle de session var).
