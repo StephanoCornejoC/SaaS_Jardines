@@ -77,6 +77,14 @@ INSTALLED_APPS = list(SHARED_APPS) + [
 TENANT_MODEL = "tenants.Tenant"
 TENANT_DOMAIN_MODEL = "tenants.Domain"
 
+# django-tenants: cuando el hostname del request NO matchea ningun Domain
+# (ej. healthcheck de Railway en *.up.railway.app, o el apex miniddo.com
+# sin un tenant asociado), el middleware usa el schema `public` y
+# `PUBLIC_SCHEMA_URLCONF` en vez de devolver 404 / DisallowedTenant.
+# Sin esto, el /health/ de Railway nunca responde 200 y el deploy falla
+# en la fase Network > Healthcheck.
+SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
+
 # --- Middleware ---
 MIDDLEWARE = [
     "django_tenants.middleware.main.TenantMainMiddleware",
