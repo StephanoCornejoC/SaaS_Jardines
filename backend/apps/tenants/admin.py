@@ -271,36 +271,50 @@ class TenantAdmin(ModelAdmin):
             from apps.cashflow.services import ensure_categorias_sistema
             ensure_categorias_sistema()
 
-        # 5. Enviar credenciales por email
+        # 5. Enviar email de bienvenida (HTML + plain text fallback)
         #
-        # Loggeo verboso a proposito: el bug clasico es que send_mail falla
-        # silenciosamente (credenciales SMTP mal, dominio no validado, etc.)
-        # y nadie se entera. Con estos logs, cualquier error queda visible
-        # en Deploy Logs de Railway con stack trace completo.
+        # Render del template HTML con branding Miniddo (teal). Mandamos
+        # ambas versiones — clientes modernos muestran HTML, clientes
+        # plain-text caen al fallback.
+        from django.template.loader import render_to_string
+        from django.core.mail import EmailMultiAlternatives
+
+        ctx = {
+            "nombre_director": data["nombres_director"],
+            "nombre_jardin": tenant.nombre,
+            "url": data["dominio"],
+            "usuario": data["email_director"],
+            "password": password,
+        }
+        subject = f"Bienvenida/o a Miniddo · {tenant.nombre}"
+        text_body = (
+            f"Hola {data['nombres_director']},\n\n"
+            f"El jardín {tenant.nombre} ya está disponible en Miniddo.\n\n"
+            f"URL: https://{data['dominio']}\n"
+            f"Usuario: {data['email_director']}\n"
+            f"Contraseña: {password}\n\n"
+            f"Por seguridad, te recomendamos cambiar tu contraseña al ingresar.\n\n"
+            f"Gracias por ser parte de Miniddo.\n"
+            f"— Una aplicación de COREM LABS"
+        )
+        html_body = render_to_string("email/welcome_jardin.html", ctx)
+
         logger.info(
-            "Preparando envio de email de bienvenida: from=%s to=%s subject_tenant=%s backend=%s",
+            "Preparando envio de email de bienvenida: from=%s to=%s subject=%s backend=%s",
             settings.DEFAULT_FROM_EMAIL,
             data["email_director"],
-            tenant.nombre,
+            subject,
             settings.EMAIL_BACKEND,
         )
         try:
-            from django.core.mail import send_mail
-            sent_count = send_mail(
-                subject=f"Bienvenido a COREM — Acceso a {tenant.nombre}",
-                message=(
-                    f"Hola {data['nombres_director']},\n\n"
-                    f"Su jardín '{tenant.nombre}' ya está activo en COREM.\n\n"
-                    f"URL: http://{data['dominio']}\n"
-                    f"Usuario: {data['email_director']}\n"
-                    f"Contraseña inicial: {password}\n\n"
-                    f"Le recomendamos cambiar la contraseña al ingresar.\n\n"
-                    f"— Equipo COREM"
-                ),
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=text_body,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[data["email_director"]],
-                fail_silently=False,  # antes True; ahora levantamos excepciones SMTP
+                to=[data["email_director"]],
             )
+            msg.attach_alternative(html_body, "text/html")
+            sent_count = msg.send(fail_silently=False)
             logger.info(
                 "Email de bienvenida enviado OK: to=%s sent_count=%s",
                 data["email_director"], sent_count,
@@ -310,8 +324,8 @@ class TenantAdmin(ModelAdmin):
                 "Error al enviar email de bienvenida a %s: %s",
                 data["email_director"], e,
             )
-            # NO re-raise: la creacion del tenant ya esta hecha. Si el email
-            # falla, el SUPERADMIN puede ver la pass en los logs y mandarla manual.
+            # NO re-raise: el tenant ya esta creado. Si el email falla, el
+            # SUPERADMIN puede ver la pass en los logs y mandarla manual.
 
         return tenant
 
