@@ -5,7 +5,7 @@
     "dockerfilePath": "Dockerfile"
   },
   "deploy": {
-    "preDeployCommand": "python -u manage.py migrate_schemas --shared && python -u manage.py createcachetable && python -u manage.py ensure_superuser",
+    "preDeployCommand": "python -u manage.py migrate_schemas --shared",
     "startCommand": "sh start.sh",
     "healthcheckPath": "/health/",
     "restartPolicyType": "ON_FAILURE",

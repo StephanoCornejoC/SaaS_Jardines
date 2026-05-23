@@ -1,13 +1,26 @@
 #!/bin/sh
 # Entry point del servicio web en Railway.
 #
-# Por que un script .sh en vez de poner el comando directo en railway.json:
-# Railway ejecuta el startCommand via execve syscall SIN shell, asi que las
-# variables como $PORT no se expanden (gunicorn las recibe literal como string).
-# Envolverlo en `sh start.sh` fuerza shell expansion correcta de $PORT y demas.
+# Diseño:
+#   - migrate_schemas vive en preDeployCommand (corre antes del container)
+#     porque toca el schema de DB y queremos que falle deploy si falla.
+#   - createcachetable y ensure_superuser viven aca en start.sh porque son
+#     idempotentes (no rompen si la tabla/user ya existe) y porque
+#     observamos que el preDeployCommand de Railway no ejecutaba consistentemente
+#     todos los comandos encadenados con &&.
 #
-# preDeployCommand (migrations + createcachetable + ensure_superuser) sigue
-# corriendo aparte, en railway.json. Este script solo arranca gunicorn.
+# Variables:
+#   $PORT: Railway lo inyecta; necesitamos shell expansion (por eso el .sh).
+
+set -e
+
+echo "=== Step: createcachetable ==="
+python -u manage.py createcachetable || echo "createcachetable: tabla ya existia (OK)"
+
+echo "=== Step: ensure_superuser ==="
+python -u manage.py ensure_superuser
+
+echo "=== Step: starting gunicorn on port $PORT ==="
 exec python -u -m gunicorn config.wsgi:application \
   --bind 0.0.0.0:$PORT \
   --workers 2 \
