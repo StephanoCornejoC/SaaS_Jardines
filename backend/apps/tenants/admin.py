@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 from datetime import date, timedelta
@@ -5,6 +6,8 @@ from datetime import date, timedelta
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
+
+logger = logging.getLogger(__name__)
 from django.contrib.admin import ModelAdmin
 from django.db import transaction
 from django.shortcuts import redirect, render
@@ -269,9 +272,21 @@ class TenantAdmin(ModelAdmin):
             ensure_categorias_sistema()
 
         # 5. Enviar credenciales por email
+        #
+        # Loggeo verboso a proposito: el bug clasico es que send_mail falla
+        # silenciosamente (credenciales SMTP mal, dominio no validado, etc.)
+        # y nadie se entera. Con estos logs, cualquier error queda visible
+        # en Deploy Logs de Railway con stack trace completo.
+        logger.info(
+            "Preparando envio de email de bienvenida: from=%s to=%s subject_tenant=%s backend=%s",
+            settings.DEFAULT_FROM_EMAIL,
+            data["email_director"],
+            tenant.nombre,
+            settings.EMAIL_BACKEND,
+        )
         try:
             from django.core.mail import send_mail
-            send_mail(
+            sent_count = send_mail(
                 subject=f"Bienvenido a COREM — Acceso a {tenant.nombre}",
                 message=(
                     f"Hola {data['nombres_director']},\n\n"
@@ -284,10 +299,19 @@ class TenantAdmin(ModelAdmin):
                 ),
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[data["email_director"]],
-                fail_silently=True,
+                fail_silently=False,  # antes True; ahora levantamos excepciones SMTP
             )
-        except Exception:
-            pass
+            logger.info(
+                "Email de bienvenida enviado OK: to=%s sent_count=%s",
+                data["email_director"], sent_count,
+            )
+        except Exception as e:
+            logger.exception(
+                "Error al enviar email de bienvenida a %s: %s",
+                data["email_director"], e,
+            )
+            # NO re-raise: la creacion del tenant ya esta hecha. Si el email
+            # falla, el SUPERADMIN puede ver la pass en los logs y mandarla manual.
 
         return tenant
 
