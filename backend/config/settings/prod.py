@@ -45,6 +45,12 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
 ]
 CORS_ALLOW_CREDENTIALS = True
 
+# Permitir el header X-Tenant cross-origin. El frontend Vercel lo manda en
+# cada request para identificar el tenant (ver TenantHeaderMiddleware).
+# Los default headers de django-cors-headers + nuestro custom.
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = (*default_headers, "x-tenant")
+
 # Cache compartido entre workers de gunicorn vía Postgres.
 # Antes usábamos Redis, pero al consolidar los crons en `daily_saas_run`
 # Redis dejó de tener uso. DatabaseCache nos da un store compartido sin

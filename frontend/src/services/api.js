@@ -10,11 +10,41 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Request interceptor: attach JWT token
+/**
+ * Extrae el slug del tenant desde el subdomain actual.
+ *
+ * Ejemplo: window.location.host = "garabato.miniddo.com"
+ *   - parts = ["garabato", "miniddo", "com"]
+ *   - Si hay >= 3 partes y la 2da es "miniddo", el tenant es la 1ra parte.
+ *   - Si no, no hay tenant (apex miniddo.com o localhost en dev).
+ *
+ * El backend usa este header en TenantHeaderMiddleware para activar el
+ * schema correcto cuando recibe requests cross-origin (Vercel → Railway).
+ */
+function detectTenantSlug() {
+  if (typeof window === "undefined") return null;
+  const host = window.location.hostname;
+  const parts = host.split(".");
+  // garabato.miniddo.com → ["garabato", "miniddo", "com"], tenant = garabato
+  // miniddo.com         → ["miniddo", "com"], sin tenant
+  // localhost           → ["localhost"], sin tenant
+  if (parts.length >= 3 && parts.slice(-2).join(".") === "miniddo.com") {
+    return parts[0];
+  }
+  return null;
+}
+
+// Request interceptor: attach JWT token + X-Tenant header
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("access_token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
+  }
+  // Identifica el tenant al backend (necesario en deploys multi-host:
+  // frontend Vercel en garabato.miniddo.com + backend Railway en api.miniddo.com)
+  const tenantSlug = detectTenantSlug();
+  if (tenantSlug) {
+    config.headers["X-Tenant"] = tenantSlug;
   }
   return config;
 });

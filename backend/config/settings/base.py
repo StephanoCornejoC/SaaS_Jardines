@@ -88,6 +88,11 @@ SHOW_PUBLIC_IF_NO_TENANT_FOUND = True
 # --- Middleware ---
 MIDDLEWARE = [
     "django_tenants.middleware.main.TenantMainMiddleware",
+    # Permite que el frontend Vercel (servido en subdomain tenant) mande
+    # requests a api.miniddo.com con header `X-Tenant: <schema>` que activa
+    # el schema correcto. Override del subdomain default. Ver:
+    # config/tenant_header_middleware.py
+    "config.tenant_header_middleware.TenantHeaderMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
