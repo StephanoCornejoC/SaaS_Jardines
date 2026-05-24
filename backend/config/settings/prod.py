@@ -24,8 +24,25 @@ DATABASES = {
     }
 }
 
-# CORS - Only allow Vercel frontend
+# CORS - Permite el frontend Vercel servido en miniddo.com + cualquier tenant subdomain.
+#
+# Combinamos 2 mecanismos:
+#
+# 1. CORS_ALLOWED_ORIGINS (lista explicita desde env var). Util para hosts que
+#    NO son subdomains de miniddo.com, ej: kiddo-xxxx.vercel.app durante setup
+#    inicial, o cualquier dominio adicional. Comma-separated.
+#
+# 2. CORS_ALLOWED_ORIGIN_REGEXES (regex). Esto cubre AUTOMATICAMENTE todos los
+#    subdomains de miniddo.com (garabato.miniddo.com, jardin2.miniddo.com, etc.)
+#    sin tener que editar env vars al crear cada tenant. El apex miniddo.com
+#    tambien matchea con `([\w-]+\.)?` opcional.
+#
+# CORS_ALLOW_CREDENTIALS=True para que el frontend pueda mandar cookies (sesion
+# admin Django) y headers Authorization (JWT) en cross-origin requests.
 CORS_ALLOWED_ORIGINS = [o for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://([\w-]+\.)?miniddo\.com$",
+]
 CORS_ALLOW_CREDENTIALS = True
 
 # Cache compartido entre workers de gunicorn vía Postgres.
