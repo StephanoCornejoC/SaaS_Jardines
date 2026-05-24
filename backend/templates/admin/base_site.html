@@ -5,7 +5,7 @@
 
 {% block branding %}
 {% comment %}
-  Branding fijo "Kiddo · Admin" en TODOS los modos. El nombre del jardín
+  Branding fijo "Miniddo · Admin" en TODOS los modos. El nombre del jardín
   activo se muestra solo en el banner teal (nav-global). Antes lo mostrábamos
   acá también y se sentía redundante / pesado visualmente.
 
@@ -14,7 +14,7 @@
 {% endcomment %}
 <h1 id="site-name">
   <a href="/admin/" style="color:inherit">
-    {{ site_header|default:_('Kiddo · Admin') }}
+    {{ site_header|default:_('Miniddo · Admin') }}
   </a>
 </h1>
 {% endblock %}
@@ -22,40 +22,86 @@
 {% block extrastyle %}
 {{ block.super }}
 <style>
-  /* Banner del modo Operar jardín */
+  /* Refinamientos sutiles sobre corem.css para mejorar la sensación visual
+     general del admin Miniddo. Animaciones suaves + spacing más prolijo. */
+
+  /* Site name: tipografía más moderna y peso mayor */
+  #site-name a {
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  }
+
+  /* Tablas: transiciones suaves al hacer hover */
+  #changelist table tbody tr {
+    transition: background 0.12s ease;
+  }
+
+  /* Botones object-tools (esquina derecha): hover con elevación sutil */
+  .object-tools a {
+    transition: background 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 1px 3px rgba(13, 148, 136, 0.15);
+  }
+  .object-tools a:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(13, 148, 136, 0.25);
+  }
+
+  /* Submit-row: pegar al fondo del form con mejor contraste */
+  .submit-row {
+    box-shadow: 0 -2px 6px rgba(0,0,0,0.04);
+  }
+
+  /* Banner del modo Operar jardín — diseño elegante con gradient + acento */
   .tenant-banner {
-    background: linear-gradient(90deg, #0d9488 0%, #0f766e 100%);
+    background: linear-gradient(135deg, #0d9488 0%, #0f766e 50%, #115e59 100%);
     color: #fff;
-    padding: 10px 24px;
+    padding: 14px 28px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;
-    gap: 12px;
+    gap: 14px;
     font-size: 13px;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.18);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
   }
-  .tenant-banner .info { display: flex; align-items: center; gap: 8px; }
+  .tenant-banner .info { display: flex; align-items: center; gap: 12px; }
   .tenant-banner .label {
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    font-size: 11px;
-    opacity: 0.85;
-    font-weight: 600;
+    letter-spacing: 0.8px;
+    font-size: 10px;
+    opacity: 0.78;
+    font-weight: 700;
+    background: rgba(255,255,255,0.12);
+    padding: 4px 9px;
+    border-radius: 999px;
   }
-  .tenant-banner .nombre { font-weight: 700; font-size: 15px; }
-  .tenant-banner .meta { opacity: 0.85; font-size: 12px; }
+  .tenant-banner .nombre {
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 0.2px;
+  }
+  .tenant-banner .meta {
+    opacity: 0.85;
+    font-size: 11px;
+    font-weight: 500;
+  }
   .tenant-banner a.back {
-    background: rgba(255,255,255,0.18);
+    background: rgba(255,255,255,0.16);
     color: #fff;
-    padding: 6px 12px;
-    border-radius: 4px;
+    padding: 7px 14px;
+    border-radius: 6px;
     text-decoration: none;
     font-weight: 600;
-    border: 1px solid rgba(255,255,255,0.25);
+    font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.22);
+    transition: background 0.15s ease, transform 0.15s ease;
   }
   .tenant-banner a.back:hover {
     background: rgba(255,255,255,0.28);
     text-decoration: none;
+    transform: translateY(-1px);
   }
 </style>
 {% endblock %}
@@ -68,7 +114,7 @@
       <span class="nombre">{{ active_tenant.nombre }}</span>
       <span class="meta">· schema <code style="background:rgba(0,0,0,0.18);padding:1px 6px;border-radius:3px">{{ active_tenant.schema_name }}</code></span>
     </div>
-    <a class="back" href="/admin/op/exit/">← Volver al panel de Kiddo</a>
+    <a class="back" href="/admin/op/exit/">← Volver al panel de Miniddo</a>
   </div>
 {% endif %}
 {{ block.super }}

@@ -1,5 +1,5 @@
 """
-AdminSite custom: Kiddo · Admin.
+AdminSite custom: Miniddo · Admin.
 
 Diseño:
   Un único `CoremAdminSite` (alias `admin.site`, namespace `admin:`).
@@ -21,9 +21,9 @@ Diseño:
 
   Nota histórica: este admin se llamaba "Hub" cuando era multi-vertical
   (jardines + empresas web). El vertical de empresas se eliminó y el
-  admin quedó dedicado al SaaS Kiddo. El nombre de la clase
+  admin quedó dedicado al SaaS Miniddo. El nombre de la clase
   `CoremAdminSite` se mantiene por compatibilidad con migrations y
-  URLconf — el branding visible es "Kiddo · Admin".
+  URLconf — el branding visible es "Miniddo · Admin".
 """
 
 from collections import OrderedDict
@@ -35,7 +35,7 @@ from django.db import connection
 from django.db.models import Sum
 
 
-# Apps del schema público (admin del SuperAdmin de Kiddo)
+# Apps del schema público (admin del SuperAdmin de Miniddo)
 PUBLIC_ONLY_APPS = {"platform", "tenants"}
 
 # Apps de schema tenant (modelos del jardín)
@@ -51,7 +51,7 @@ SHARED_APPS_VISIBLE = {"users", "auth"}
 
 
 # ============================================================================
-# Pilares del admin Kiddo (modo NORMAL — sin tenant activo)
+# Pilares del admin Miniddo (modo NORMAL — sin tenant activo)
 # ============================================================================
 
 PUBLIC_GROUPS = OrderedDict([
@@ -118,14 +118,14 @@ def _active_tenant_schema(request):
 
 
 class CoremAdminSite(admin.AdminSite):
-    """AdminSite del SaaS Kiddo. Cambia la lista de modelos visibles
+    """AdminSite del SaaS Miniddo. Cambia la lista de modelos visibles
     según `request.session['active_tenant_schema']`:
-      - vacío → admin de Kiddo (modelos shared agrupados en pilares)
+      - vacío → admin de Miniddo (modelos shared agrupados en pilares)
       - seteado → Operar Jardín (modelos del jardín activo)
     """
 
-    site_header = "Kiddo · Admin"
-    site_title = "Kiddo"
+    site_header = "Miniddo · Admin"
+    site_title = "Miniddo"
     index_title = "Panel central"
     enable_nav_sidebar = True
     index_template = "admin/corem_index.html"
@@ -207,7 +207,7 @@ class CoremAdminSite(admin.AdminSite):
 
         return result
 
-    # ----- Index (admin Kiddo muestra grilla de jardines + KPIs) -----
+    # ----- Index (admin Miniddo muestra grilla de jardines + KPIs) -----
 
     def index(self, request, extra_context=None):
         ctx = {"in_tenant_mode": self.is_tenant_mode(request)}
@@ -272,7 +272,7 @@ def _jardin_items(active_schema=None):
 
 
 # ============================================================================
-# Helpers de contexto para el admin Kiddo
+# Helpers de contexto para el admin Miniddo
 # ============================================================================
 
 # Orden de prioridad de jardines en el grid: lo accionable arriba.
@@ -287,7 +287,7 @@ _TENANT_PRIORITY = {
 
 
 def _build_admin_index_context():
-    """Construye el contexto del index del admin Kiddo: KPIs, alertas, jardines.
+    """Construye el contexto del index del admin Miniddo: KPIs, alertas, jardines.
 
     Una sola pasada por la BD (sin N+1):
       - 1 query para TenantSubscription (select_related tenant)

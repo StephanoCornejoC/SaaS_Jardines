@@ -26,11 +26,34 @@ const { Text, Link } = Typography;
 
 // Branding del SaaS y datos de soporte. Definidos como constantes para que
 // un cambio futuro (ej. número de WhatsApp distinto por release) sea un toque.
-const APP_NAME = "Kiddo"; // nombre comercial del SaaS, visible al usuario
+const APP_NAME = "Miniddo"; // nombre comercial del SaaS, visible al usuario
 const SUPPORT_WHATSAPP_DISPLAY = "+51 940 183 490";
 const SUPPORT_WHATSAPP_INTL = "51940183490"; // sin "+", para wa.me
 const SUPPORT_EMAIL = "stephano.cornejoc@gmail.com";
 const BRAND_NAME = "COREM LABS"; // empresa desarrolladora (atribución en footer)
+
+/**
+ * Extrae y formatea el nombre del jardín a partir del subdomain actual.
+ * Ej: window.location.hostname = "garabato.miniddo.com" → "Garabato"
+ *     "jardin-test-2.miniddo.com"                       → "Jardin Test 2"
+ *     "miniddo.com" (sin subdomain)                     → null
+ *
+ * Reemplaza el guión por espacio y capitaliza palabras para que se vea
+ * presentable en el header en lugar del email del user logueado.
+ */
+function getJardinDisplayName() {
+  if (typeof window === "undefined") return null;
+  const host = window.location.hostname;
+  const parts = host.split(".");
+  if (parts.length >= 3 && parts.slice(-2).join(".") === "miniddo.com") {
+    const slug = parts[0];
+    return slug
+      .split(/[-_]/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(" ");
+  }
+  return null;
+}
 
 // Altura aproximada del footer fijo, para reservar espacio inferior del Content
 // y evitar que la última fila quede tapada por el footer.
@@ -89,9 +112,10 @@ export default function MainLayout() {
 
   const selectedKey = `/${location.pathname.split("/")[1]}`;
 
-  const userInitials = user?.nombre
-    ? user.nombre.charAt(0).toUpperCase()
-    : user?.email?.charAt(0).toUpperCase() ?? "U";
+  // Nombre visible del jardín, extraído del subdomain. Más amigable que
+  // mostrar el email del user logueado. Fallback a "Mi jardín" si no hay.
+  const jardinName = getJardinDisplayName() || "Mi jardín";
+  const userInitials = jardinName.charAt(0).toUpperCase();
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -168,11 +192,13 @@ export default function MainLayout() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Avatar
               size={32}
-              style={{ background: "#0d9488", fontSize: 13, cursor: "default" }}
+              style={{ background: "#0d9488", fontSize: 13, fontWeight: 600, cursor: "default" }}
             >
               {userInitials}
             </Avatar>
-            <Text style={{ fontSize: 13 }}>{user?.email}</Text>
+            <Text style={{ fontSize: 14, fontWeight: 600, color: "#0d9488" }}>
+              {jardinName}
+            </Text>
             <Button
               type="text"
               size="small"
@@ -232,7 +258,7 @@ export default function MainLayout() {
             style={{ justifyContent: "center", width: "100%" }}
           >
             <Text type="secondary" style={{ fontSize: 12 }}>
-              Desarrollado por{" "}
+              Una aplicación de{" "}
               <Text strong style={{ color: "#0d9488" }}>{BRAND_NAME}</Text>
             </Text>
             <Link

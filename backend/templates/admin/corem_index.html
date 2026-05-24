@@ -2,7 +2,7 @@
 {% load i18n static %}
 
 {% comment %}
-Index del CoremAdminSite — admin Kiddo (SaaS de jardines).
+Index del CoremAdminSite — admin Miniddo (SaaS de jardines).
 
 Solo se renderiza la parte custom cuando NO estamos en modo Operar Jardín
 — dentro de un tenant queremos el index nativo de Django.
@@ -20,7 +20,7 @@ Secciones (top → bottom):
   /* ===== Ocultar sidebar de "Acciones recientes" ===== */
   /* Pedido de Stephano: no se usa el widget de últimos cambios. Sacamos
      todo el panel derecho (#content-related) y dejamos que #content ocupe
-     el ancho completo. Aplica al index del admin Kiddo y al modo Operar. */
+     el ancho completo. Aplica al index del admin Miniddo y al modo Operar. */
   #content-related { display: none !important; }
   #content-main { margin-right: 0 !important; width: 100%; }
   #content.colMS { margin-right: 0 !important; }
@@ -220,7 +220,7 @@ Secciones (top → bottom):
     <div class="kpi-card">
       <div class="kpi-label">Jardines activos</div>
       <div class="kpi-value">{{ kpi_jardines_activos }} <span style="font-size:14px;color:#888;font-weight:400">de {{ kpi_jardines_total }}</span></div>
-      <div class="kpi-sub">Clientes de Kiddo</div>
+      <div class="kpi-sub">Clientes de Miniddo</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">MRR del mes</div>
@@ -294,7 +294,7 @@ Secciones (top → bottom):
 
   {% endif %}
 
-  {# App list: pilares Jardines/Suscripciones/Costos/Sistema (modo Kiddo) o modelos del jardín (modo Operar) #}
+  {# App list: pilares Jardines/Suscripciones/Costos/Sistema (modo Miniddo) o modelos del jardín (modo Operar) #}
   {% include "admin/app_list.html" with app_list=app_list show_changelinks=True %}
 
   {% if not in_tenant_mode and request.user.is_superuser %}
