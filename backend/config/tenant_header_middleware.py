@@ -1,83 +1,90 @@
 """
-Middleware que permite identificar el tenant via header `X-Tenant`
-en vez del subdomain del Host.
+Middleware que permite identificar el tenant cuando frontend y backend
+viven en hosts diferentes (Vercel + Railway, distintos subdomains).
 
-Caso de uso: el frontend Vercel (servido desde garabato.miniddo.com)
-hace requests a api.miniddo.com/api/v1/... Como `api` no es un tenant
-real, django-tenants no podría resolver el schema. Este middleware lee
-el header `X-Tenant: garabato` que el frontend agrega automáticamente
-y activa el schema correcto.
+Problema:
+- Frontend en `garabato.miniddo.com` (Vercel) hace requests a `api.miniddo.com` (Railway).
+- TenantMainMiddleware de django-tenants resuelve el schema según `request.get_host()`.
+- Como `api.miniddo.com` no es un tenant, cae al schema `public` y selecciona
+  `PUBLIC_SCHEMA_URLCONF` (urls_public.py) que NO tiene `/api/v1/...`. → 404.
 
-Diseño:
-- Si el request trae header `X-Tenant` válido (apunta a un Tenant existente),
-  hace switch al schema de ese tenant.
-- Si NO trae header o el valor es inválido, deja el comportamiento default
-  (django-tenants TenantMainMiddleware lo resuelve por Host).
-- DEBE ir DESPUÉS de TenantMainMiddleware en la lista MIDDLEWARE.
+Solución:
+- Este middleware corre ANTES de TenantMainMiddleware.
+- Lee el subdomain del header `Origin` del browser (estándar CORS) o del
+  header explícito `X-Tenant` como fallback.
+- Si encuentra un tenant válido, modifica `request.META["HTTP_HOST"]` para
+  que TenantMainMiddleware lo resuelva como ese tenant.
+- Después, todo funciona como si el request viniera del subdomain del tenant.
 
-Seguridad: `X-Tenant` es solo un identificador (slug), no auth. Las
-credenciales JWT/password siguen validándose contra los users del schema
-identificado.
+Detección del tenant slug (en orden):
+1. Header `Origin` (ej. "https://garabato.miniddo.com" → "garabato")
+2. Header `X-Tenant` (ej. "garabato")
+
+Si no hay match, el comportamiento queda default (TenantMainMiddleware
+resuelve por Host real).
 """
 import logging
+from urllib.parse import urlparse
 
-from django.db import connection
-from django_tenants.utils import schema_exists, get_tenant_model
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
 
+def _extract_tenant_from_origin(origin_value):
+    """
+    Extrae el slug del tenant del header Origin.
+    Ej: "https://garabato.miniddo.com" → "garabato"
+        "https://miniddo.com"           → None (apex, no tenant)
+        "http://localhost:3000"         → None
+    """
+    if not origin_value:
+        return None
+    try:
+        parsed = urlparse(origin_value)
+        host = parsed.hostname or ""
+        base_domain = getattr(settings, "TENANT_BASE_DOMAIN", "miniddo.com")
+        # Solo aceptamos subdomains del dominio base configurado
+        if host.endswith(f".{base_domain}") and host != base_domain:
+            return host[: -len(f".{base_domain}")]
+    except Exception:
+        pass
+    return None
+
+
 class TenantHeaderMiddleware:
-    """Resuelve tenant via header `X-Tenant` (override del subdomain)."""
+    """
+    Resuelve tenant del Origin / X-Tenant header cuando frontend y backend
+    están en hosts diferentes (multi-host SaaS). DEBE ir ANTES de
+    TenantMainMiddleware en MIDDLEWARE.
+    """
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self._tenant_model = get_tenant_model()
 
     def __call__(self, request):
-        tenant_slug = request.headers.get("X-Tenant", "").strip().lower()
+        tenant_slug = None
 
-        if tenant_slug and tenant_slug != "public":
-            try:
-                # Buscar el tenant en el schema public (donde vive la tabla)
-                with schema_context_public():
-                    tenant = self._tenant_model.objects.filter(
-                        schema_name=tenant_slug
-                    ).first()
+        # 1. Intentar extraer del Origin (estándar CORS, lo envía el browser)
+        origin = request.headers.get("Origin", "")
+        tenant_slug = _extract_tenant_from_origin(origin)
 
-                if tenant:
-                    # Activar el schema para todo el request
-                    connection.set_tenant(tenant)
-                    request.tenant = tenant
-                    logger.debug(
-                        "TenantHeaderMiddleware: activado schema %s via X-Tenant",
-                        tenant_slug,
-                    )
-                else:
-                    logger.warning(
-                        "TenantHeaderMiddleware: X-Tenant '%s' no matchea ningún tenant",
-                        tenant_slug,
-                    )
-            except Exception as e:
-                logger.exception("TenantHeaderMiddleware error: %s", e)
+        # 2. Fallback al header explícito X-Tenant
+        if not tenant_slug:
+            x_tenant = request.headers.get("X-Tenant", "").strip().lower()
+            if x_tenant and x_tenant != "public":
+                tenant_slug = x_tenant
+
+        if tenant_slug:
+            base_domain = getattr(settings, "TENANT_BASE_DOMAIN", "miniddo.com")
+            new_host = f"{tenant_slug}.{base_domain}"
+            # Modificar HTTP_HOST para que TenantMainMiddleware lo vea como
+            # el subdomain del tenant. Esto fuerza la resolución correcta del
+            # schema Y del URLCONF (urls.py vs urls_public.py).
+            request.META["HTTP_HOST"] = new_host
+            logger.debug(
+                "TenantHeaderMiddleware: redirected HTTP_HOST to %s (from Origin/X-Tenant)",
+                new_host,
+            )
 
         return self.get_response(request)
-
-
-# Helper local para evitar import circular con django_tenants.utils.schema_context
-from contextlib import contextmanager
-
-
-@contextmanager
-def schema_context_public():
-    """Activa el schema public temporalmente para queries de tenant lookup."""
-    previous_tenant = getattr(connection, "tenant", None)
-    try:
-        from django_tenants.utils import get_public_schema_name
-        connection.set_schema_to_public()
-        yield
-    finally:
-        if previous_tenant:
-            connection.set_tenant(previous_tenant)
-        else:
-            connection.set_schema_to_public()
