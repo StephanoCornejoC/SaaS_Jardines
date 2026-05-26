@@ -28,12 +28,17 @@ class PlanAdmin(ModelAdmin):
 class TenantSubscriptionAdmin(ModelAdmin):
     list_display = (
         "tenant_link",
-        "plan",
+        "plan_link",       # ← callable wrapper para que list_display_links lo use
         "precio_acordado",
         "fecha_alta",
         "trial_hasta",
         "estado_badge",
     )
+    # Indicarle a Django CUAL columna del listado debe ser el link al
+    # change_view. Sin esto, el primer campo (tenant_link) ya tiene su
+    # propio <a> al tenant_change y Django no genera link al subscription
+    # change → el SUPERADMIN no podia editar estado/precio/fechas.
+    list_display_links = ("plan_link",)
     list_filter = ()
     search_fields = ("tenant__nombre", "tenant__ruc")
     autocomplete_fields = ("tenant", "plan")
@@ -51,6 +56,16 @@ class TenantSubscriptionAdmin(ModelAdmin):
     def tenant_link(self, obj):
         url = reverse("admin:tenants_tenant_change", args=[obj.tenant_id])
         return format_html('<a href="{}">{}</a>', url, obj.tenant.nombre)
+
+    @admin.display(description="Plan", ordering="plan__nombre")
+    def plan_link(self, obj):
+        """
+        Wrapper sobre el campo plan que se renderiza como texto plano
+        (sin <a>). Django (gracias a list_display_links) lo envuelve
+        automaticamente en un link al change_view de esta Subscription.
+        Asi el SUPERADMIN puede editar precio_acordado, estado, fechas, etc.
+        """
+        return obj.plan.nombre if obj.plan else "(sin plan)"
 
     @admin.display(description="Estado")
     def estado_badge(self, obj):
