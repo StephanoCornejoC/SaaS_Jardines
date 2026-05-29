@@ -1,0 +1,191 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}
+  <div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:tenants_tenant_changelist' %}">Jardines</a>
+    &rsaquo; <a href="{% url 'admin:tenants_tenant_change' tenant.id %}">{{ tenant.nombre }}</a>
+    &rsaquo; Importar Excel
+  </div>
+{% endblock %}
+
+{% block extrahead %}
+  {{ block.super }}
+  <style>
+    .imp-section { background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+                   padding:18px 22px; margin-bottom:18px; max-width:880px; }
+    .imp-section h2 { font-size:15px; font-weight:600; color:#0f172a; margin:0 0 12px; }
+    .imp-section p  { color:#475569; font-size:13px; margin:0 0 12px; }
+    .imp-grid       { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+                      gap:12px; margin:12px 0; }
+    .imp-card       { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;
+                      padding:12px 14px; }
+    .imp-card .label { font-size:11px; text-transform:uppercase; letter-spacing:.5px;
+                       color:#64748b; margin-bottom:4px; }
+    .imp-card .value { font-size:22px; font-weight:700; color:#0f172a; line-height:1.1; }
+    .imp-card .hint  { font-size:11px; color:#94a3b8; margin-top:2px; }
+    .imp-btn         { display:inline-block; padding:8px 18px; background:#0d9488;
+                       color:#fff !important; text-decoration:none; border:none;
+                       border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; }
+    .imp-btn-cancel  { background:#94a3b8; }
+    .imp-error-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .imp-error-table th, .imp-error-table td {
+                       text-align:left; padding:6px 10px; border-bottom:1px solid #fee2e2; }
+    .imp-error-table th { background:#fef2f2; font-weight:600; color:#991b1b; }
+    .imp-error-table td.fila { color:#64748b; font-family:monospace; }
+    .imp-warn        { background:#fef3c7; border:1px solid #fcd34d; color:#92400e;
+                       padding:12px 14px; border-radius:8px; }
+    .imp-success     { background:#d1fae5; border:1px solid #6ee7b7; color:#065f46;
+                       padding:12px 14px; border-radius:8px; }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <h1 style="margin-bottom:6px;">Importar Excel — {{ tenant.nombre }}</h1>
+  <p style="color:#64748b;margin-bottom:18px;font-size:13px;">
+    Schema: <code>{{ tenant.schema_name }}</code> · RUC: {{ tenant.ruc }}
+  </p>
+
+  {# ---------- Estado: jardín ya tiene datos ---------- #}
+  {% if schema_not_empty %}
+    <div class="imp-section">
+      <div class="imp-warn">
+        ⚠️ <b>Este jardín ya tiene datos cargados.</b> El import asume jardín
+        vacío (sin aulas, profesores ni alumnos) para garantizar la consistencia.
+        Si quiere reimportar, primero borre todos los datos del schema desde
+        el admin del jardín y vuelva acá.
+      </div>
+    </div>
+
+  {# ---------- Estado: import exitoso ---------- #}
+  {% elif result %}
+    <div class="imp-section">
+      <div class="imp-success">
+        ✅ <b>Import completado correctamente.</b> Los datos ya están en el schema
+        del jardín y la directora puede empezar a usarlos.
+      </div>
+      <h2 style="margin-top:18px;">Resumen</h2>
+      <div class="imp-grid">
+        <div class="imp-card"><div class="label">Aulas</div><div class="value">{{ result.aulas }}</div></div>
+        <div class="imp-card"><div class="label">Profesores</div><div class="value">{{ result.profesores }}</div></div>
+        <div class="imp-card"><div class="label">Alumnos</div><div class="value">{{ result.alumnos }}</div></div>
+        <div class="imp-card"><div class="label">Apoderados</div><div class="value">{{ result.apoderados }}</div></div>
+        <div class="imp-card"><div class="label">Matrículas</div><div class="value">{{ result.enrollments }}</div></div>
+        <div class="imp-card"><div class="label">Cuotas mensuales</div><div class="value">{{ result.payments }}</div></div>
+      </div>
+      <a href="{% url 'admin:tenants_tenant_changelist' %}" class="imp-btn">
+        ← Volver a la lista de jardines
+      </a>
+    </div>
+
+  {# ---------- Estado: hay errores de validación ---------- #}
+  {% elif errors_list %}
+    <div class="imp-section">
+      <h2 style="color:#b91c1c;">❌ Se encontraron {{ errors_list|length }} error(es)</h2>
+      <p>No se creó nada. Corrija los errores en el Excel y vuelva a subirlo.</p>
+      <table class="imp-error-table">
+        <thead>
+          <tr><th>Hoja</th><th>Fila</th><th>Detalle</th></tr>
+        </thead>
+        <tbody>
+          {% for e in errors_list %}
+            <tr>
+              <td><b>{{ e.hoja }}</b></td>
+              <td class="fila">{{ e.fila }}</td>
+              <td>{{ e.msg }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div style="margin-top:14px;">
+        <a href="{{ request.path }}" class="imp-btn imp-btn-cancel">
+          ← Volver a subir
+        </a>
+      </div>
+    </div>
+
+  {# ---------- Estado: preview esperando confirmación ---------- #}
+  {% elif preview %}
+    <div class="imp-section">
+      <div class="imp-success">
+        ✅ <b>El archivo se validó correctamente.</b> Revise los totales y confirme
+        para crear todo en el jardín.
+      </div>
+
+      <h2 style="margin-top:18px;">Se van a crear</h2>
+      <div class="imp-grid">
+        <div class="imp-card">
+          <div class="label">Aulas</div>
+          <div class="value">{{ preview.aulas }}</div>
+        </div>
+        <div class="imp-card">
+          <div class="label">Profesores</div>
+          <div class="value">{{ preview.profesores }}</div>
+        </div>
+        <div class="imp-card">
+          <div class="label">Alumnos</div>
+          <div class="value">{{ preview.alumnos }}</div>
+        </div>
+        <div class="imp-card">
+          <div class="label">Apoderados</div>
+          <div class="value">{{ preview.apoderados }}</div>
+        </div>
+        <div class="imp-card">
+          <div class="label">Matrículas</div>
+          <div class="value">{{ preview.estimado_enrollments }}</div>
+          <div class="hint">Una por alumno, año {{ preview.anio_escolar }}</div>
+        </div>
+        <div class="imp-card">
+          <div class="label">Cuotas mensuales</div>
+          <div class="value">{{ preview.estimado_payments }}</div>
+          <div class="hint">10 por alumno (marzo-diciembre), todas PENDIENTE</div>
+        </div>
+      </div>
+
+      <h2 style="margin-top:18px;">Configuración financiera</h2>
+      <p style="color:#475569;">
+        Año escolar: <b>{{ preview.anio_escolar }}</b> ·
+        Matrícula base: <b>S/ {{ preview.matricula_base }}</b> ·
+        Pensión base: <b>S/ {{ preview.pension_base }}</b>
+      </p>
+
+      <form method="post" style="margin-top:18px;">
+        {% csrf_token %}
+        <input type="hidden" name="confirmar" value="1">
+        <button type="submit" class="imp-btn">
+          ✓ Confirmar y crear todo
+        </button>
+        <a href="{{ request.path }}" class="imp-btn imp-btn-cancel" style="margin-left:8px;">
+          Cancelar
+        </a>
+      </form>
+    </div>
+
+  {# ---------- Estado: formulario inicial ---------- #}
+  {% else %}
+    <div class="imp-section">
+      <h2>Subir plantilla completada</h2>
+      <p>
+        Suba el archivo Excel que la directora del jardín ya completó. El sistema
+        validará los datos y mostrará un resumen antes de crear nada en la base.
+        Si hay errores, no se ejecuta el import.
+      </p>
+      <p style="font-size:12px;color:#64748b;">
+        ¿No tiene la plantilla? Solicítela al equipo de Miniddo.
+        Archivos aceptados: <code>.xlsx</code> (Excel moderno).
+      </p>
+
+      <form method="post" enctype="multipart/form-data" style="margin-top:14px;">
+        {% csrf_token %}
+        <input type="file" name="archivo" accept=".xlsx" required
+               style="display:block;margin-bottom:14px;">
+        <button type="submit" class="imp-btn">Subir y validar</button>
+        <a href="{% url 'admin:tenants_tenant_changelist' %}"
+           class="imp-btn imp-btn-cancel" style="margin-left:8px;">
+          Cancelar
+        </a>
+      </form>
+    </div>
+  {% endif %}
+{% endblock %}

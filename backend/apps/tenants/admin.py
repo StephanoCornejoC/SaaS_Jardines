@@ -88,6 +88,7 @@ class TenantAdmin(ModelAdmin):
         "estado_subscription",
         "operar_link",
         "cobro_ahora_link",
+        "importar_excel_link",
         "activo",
         "created_at",
     )
@@ -123,6 +124,11 @@ class TenantAdmin(ModelAdmin):
                 "<int:tenant_id>/emitir-cobro/",
                 self.admin_site.admin_view(self.emitir_cobro_view),
                 name="tenants_tenant_emitir_cobro",
+            ),
+            path(
+                "<int:tenant_id>/importar-excel/",
+                self.admin_site.admin_view(self.importar_excel_view),
+                name="tenants_tenant_importar_excel",
             ),
         ]
         return custom + urls
@@ -195,6 +201,18 @@ class TenantAdmin(ModelAdmin):
         url = f"/admin/op/{obj.schema_name}/"
         return format_html(
             '<a href="{}" class="button" style="padding:4px 10px;background:#0d9488;color:white;border-radius:4px;text-decoration:none;font-size:11px">Operar ↗</a>',
+            url,
+        )
+
+    @admin.display(description="Importar")
+    def importar_excel_link(self, obj):
+        url = reverse("admin:tenants_tenant_importar_excel", args=[obj.id])
+        return format_html(
+            '<a href="{}" class="button" '
+            'style="padding:4px 10px;background:#6366f1;color:white;'
+            'border-radius:4px;text-decoration:none;font-size:11px" '
+            'title="Importar datos iniciales del jardín desde Excel">'
+            'Excel ↥</a>',
             url,
         )
 
@@ -339,6 +357,132 @@ class TenantAdmin(ModelAdmin):
             # SUPERADMIN puede ver la pass en los logs y mandarla manual.
 
         return tenant
+
+    # =========================================================================
+    # Importar Excel de onboarding
+    # =========================================================================
+
+    def importar_excel_view(self, request, tenant_id):
+        """
+        Importa los datos iniciales de un jardín desde la plantilla Excel.
+
+        Flujo en 2 fases:
+          1. Upload del archivo (POST sin 'confirmar'): parsea + valida +
+             muestra preview con counts. Si hay errores, los muestra y no
+             ejecuta nada.
+          2. Confirmación (POST con 'confirmar=1'): lee el resultado parseado
+             de la sesión y crea todo dentro del schema del tenant en una
+             transacción atómica.
+
+        El import asume que el jardín está VACÍO (sin alumnos/aulas/profesores).
+        Si tiene datos, se rechaza explícitamente.
+        """
+        from . import onboarding
+
+        try:
+            tenant = Tenant.objects.get(pk=tenant_id)
+        except Tenant.DoesNotExist:
+            messages.error(request, "Jardín no encontrado.")
+            return redirect("admin:tenants_tenant_changelist")
+
+        session_key = f"onboarding_data_{tenant_id}"
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Importar Excel — {tenant.nombre}",
+            "tenant": tenant,
+            "opts": self.model._meta,
+            "errors_list": [],
+            "preview": None,
+            "result": None,
+        }
+
+        if request.method == "GET":
+            # Limpieza preventiva de sesión vieja
+            request.session.pop(session_key, None)
+            # Check si el schema está vacío
+            if not onboarding.is_schema_empty(tenant):
+                context["schema_not_empty"] = True
+            return render(request, "admin/tenants/tenant/importar_excel.html", context)
+
+        # POST
+        if request.POST.get("confirmar") == "1":
+            data = request.session.get(session_key)
+            if not data:
+                messages.error(
+                    request,
+                    "La sesión expiró. Vuelva a subir el archivo y confirmar."
+                )
+                return redirect(request.path)
+
+            if not onboarding.is_schema_empty(tenant):
+                messages.error(
+                    request,
+                    "El jardín ya tiene datos cargados. El import asume jardín vacío."
+                )
+                return redirect(request.path)
+
+            try:
+                counts = onboarding.execute_import(tenant, data, user=request.user)
+            except Exception as exc:
+                logger.error("execute_import falló para tenant=%s: %s", tenant.id, exc)
+                messages.error(
+                    request,
+                    f"Error al ejecutar el import: {exc}. Nada se creó (rollback completo)."
+                )
+                return redirect(request.path)
+
+            request.session.pop(session_key, None)
+            messages.success(
+                request,
+                f"Import exitoso: {counts['aulas']} aulas, {counts['profesores']} profesores, "
+                f"{counts['alumnos']} alumnos, {counts['apoderados']} apoderados, "
+                f"{counts['enrollments']} matrículas, {counts['payments']} cuotas mensuales."
+            )
+            context["result"] = counts
+            return render(request, "admin/tenants/tenant/importar_excel.html", context)
+
+        # Upload del archivo
+        archivo = request.FILES.get("archivo")
+        if not archivo:
+            messages.error(request, "Debe seleccionar un archivo .xlsx.")
+            return redirect(request.path)
+
+        if not archivo.name.lower().endswith(".xlsx"):
+            messages.error(request, "El archivo debe ser .xlsx (formato Excel moderno).")
+            return redirect(request.path)
+
+        if not onboarding.is_schema_empty(tenant):
+            context["schema_not_empty"] = True
+            return render(request, "admin/tenants/tenant/importar_excel.html", context)
+
+        # Parsear
+        parsed = onboarding.parse_excel(archivo)
+        errors_list = list(parsed["errors"])
+        if not errors_list:
+            errors_list += onboarding.validate_cross_sheet(parsed)
+
+        if errors_list:
+            context["errors_list"] = errors_list
+            return render(request, "admin/tenants/tenant/importar_excel.html", context)
+
+        # OK: guardar en sesión y mostrar preview
+        request.session[session_key] = onboarding.serialize_for_session(parsed)
+        # La sesión expira con la session lifetime de Django (default 2 semanas).
+        # Para imports debería estar resuelto en minutos.
+        cfg = parsed["config"]
+        context["preview"] = {
+            "aulas": len(parsed["aulas"]),
+            "profesores": len(parsed["profesores"]),
+            "alumnos": len(parsed["alumnos"]),
+            "apoderados": len(parsed["apoderados"]),
+            "anio_escolar": cfg.get("anio_escolar"),
+            "matricula_base": cfg.get("monto_matricula_base"),
+            "pension_base": cfg.get("monto_pension_base"),
+            "estimado_enrollments": len(parsed["alumnos"]),
+            "estimado_payments": len(parsed["alumnos"]) * 10,
+        }
+        return render(request, "admin/tenants/tenant/importar_excel.html", context)
 
 
 @admin.register(Domain)
