@@ -146,22 +146,21 @@ class Migration(migrations.Migration):
 
     operations = [
         # 0. Limpieza defensiva de residuos de intentos previos.
-        # Cuando un deploy de Railway fallaba a mitad de esta migración,
-        # algunos índices y columnas quedaban committadas (django-tenants +
-        # ciertos DDL de Postgres no siempre rollbackean limpiamente, y un
-        # kill del container puede dejar la transacción en estado raro).
-        # Estos DROP IF EXISTS son no-op si la BD está limpia y resuelven
-        # el caso donde un re-deploy se rompe con
-        # `psycopg2.errors.DuplicateTable: relation ... already exists`.
+        # SlugField fuerza db_index=True por default, lo que generaba el
+        # índice secundario `_d4ad4e10` Y el `_d4ad4e10_like` desde el
+        # AddField inicial. Después el AlterField unique=True intentaba
+        # recrear el `_like`, generando `DuplicateTable`. La lista cubre
+        # los 3 índices que SlugField + unique pueden dejar:
+        #   - <table>_<col>_<hash>          ← db_index implícito
+        #   - <table>_<col>_<hash>_like     ← varchar_pattern_ops
+        #   - <table>_<col>_<hash>_uniq     ← UNIQUE constraint
+        # más el legacy `_key` y la columna entera por si quedaron.
         migrations.RunSQL(
             sql=[
-                # Índices unique + _like del slug (Django los crea cuando
-                # un CharField/SlugField tiene unique=True).
+                "DROP INDEX IF EXISTS platform_plan_slug_d4ad4e10;",
                 "DROP INDEX IF EXISTS platform_plan_slug_d4ad4e10_like;",
+                "DROP INDEX IF EXISTS platform_plan_slug_d4ad4e10_uniq;",
                 "DROP INDEX IF EXISTS platform_plan_slug_key;",
-                # Columnas que esta migración agrega; si quedaron de un
-                # intento previo las recreamos limpias en los AddField
-                # siguientes.
                 "ALTER TABLE platform_plan DROP COLUMN IF EXISTS slug;",
                 "ALTER TABLE platform_plan DROP COLUMN IF EXISTS alumnos_min;",
                 "ALTER TABLE platform_plan DROP COLUMN IF EXISTS alumnos_max;",
@@ -169,14 +168,19 @@ class Migration(migrations.Migration):
             ],
             reverse_sql=migrations.RunSQL.noop,
         ),
-        # 1. Add fields nuevos sin constraints fuertes — todos nullable o con
-        # default. Esto NO crea índices unique todavía.
+        # 1. Add fields nuevos. IMPORTANTE: slug se agrega con db_index=False
+        # explícito. SlugField default es db_index=True que crea el índice
+        # secundario + el `_like` desde el ADD COLUMN. Eso entra en conflicto
+        # con el AlterField posterior que marca unique=True (que también
+        # quiere crear `_like`). Al diferir TODA la creación de índices al
+        # AlterField final del slug, no hay colisión.
         migrations.AddField(
             model_name="plan",
             name="slug",
             field=models.SlugField(
                 max_length=20,
                 null=True,
+                db_index=False,
                 help_text="Identificador único en código (mini, plus, pro, max).",
             ),
         ),
