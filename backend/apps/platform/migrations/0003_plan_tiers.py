@@ -112,6 +112,23 @@ def revertir_planes(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
+    # atomic=False hace que cada operation se commitee independientemente
+    # en lugar de envolver TODA la migración en una sola transacción. Es
+    # imprescindible acá porque:
+    #
+    # 1. Si la migración falla a mitad con atomic=True, el rollback DESHACE
+    #    nuestro cleanup defensivo (RunSQL DROP IF EXISTS) y deja los
+    #    residuos del intento anterior, generando un loop infinito de
+    #    `relation ... already exists` en re-deploys.
+    #
+    # 2. Con atomic=False el DROP IF EXISTS persiste aunque el resto falle,
+    #    permitiendo que el próximo intento arranque desde una BD limpia.
+    #
+    # Trade-off: si una operation falla, las anteriores ya committearon.
+    # En este caso es aceptable porque las operations son todas idempotentes
+    # (DROP IF EXISTS, AddField sin unique, RunPython con borrado previo).
+    atomic = False
+
     dependencies = [
         ("platform", "0002_alter_platformcost_options_platformcost_company_and_more"),
     ]
