@@ -128,6 +128,30 @@ class Migration(migrations.Migration):
     # unique=True NOT NULL. Lo mismo para precio_minimo (NOT NULL al final).
 
     operations = [
+        # 0. Limpieza defensiva de residuos de intentos previos.
+        # Cuando un deploy de Railway fallaba a mitad de esta migración,
+        # algunos índices y columnas quedaban committadas (django-tenants +
+        # ciertos DDL de Postgres no siempre rollbackean limpiamente, y un
+        # kill del container puede dejar la transacción en estado raro).
+        # Estos DROP IF EXISTS son no-op si la BD está limpia y resuelven
+        # el caso donde un re-deploy se rompe con
+        # `psycopg2.errors.DuplicateTable: relation ... already exists`.
+        migrations.RunSQL(
+            sql=[
+                # Índices unique + _like del slug (Django los crea cuando
+                # un CharField/SlugField tiene unique=True).
+                "DROP INDEX IF EXISTS platform_plan_slug_d4ad4e10_like;",
+                "DROP INDEX IF EXISTS platform_plan_slug_key;",
+                # Columnas que esta migración agrega; si quedaron de un
+                # intento previo las recreamos limpias en los AddField
+                # siguientes.
+                "ALTER TABLE platform_plan DROP COLUMN IF EXISTS slug;",
+                "ALTER TABLE platform_plan DROP COLUMN IF EXISTS alumnos_min;",
+                "ALTER TABLE platform_plan DROP COLUMN IF EXISTS alumnos_max;",
+                "ALTER TABLE platform_plan DROP COLUMN IF EXISTS precio_minimo;",
+            ],
+            reverse_sql=migrations.RunSQL.noop,
+        ),
         # 1. Add fields nuevos sin constraints fuertes — todos nullable o con
         # default. Esto NO crea índices unique todavía.
         migrations.AddField(
