@@ -3,7 +3,7 @@
 Diseño:
   Log read-only de todos los emails que el sistema envió (o intentó
   enviar). Útil para auditoría — la directora puede confirmar que un
-  email salió y a quién, y vos podés diagnosticar fallas de SMTP.
+  email salió y a quién, y soporte interno puede diagnosticar fallas de SMTP.
 
   Decisiones:
   - Badge de tipo (Recordatorio / Comunicación / Alerta asistencia / Bienvenida).

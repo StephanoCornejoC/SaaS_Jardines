@@ -8,9 +8,9 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.users.permissions import IsAdminJardinOrAbove
 from shared.validators import validate_month_param, validate_year_param
 
 # Umbral para que el archivo se mantenga en RAM. Si el reporte crece más,
@@ -59,9 +59,10 @@ def _build_response(wb, filename):
 
 class ReportViewSet(viewsets.ViewSet):
     """
-    ViewSet para generación de reportes Excel.
+    ViewSet para generación de reportes Excel. Solo admin: las profesoras
+    no descargan reportes financieros.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminJardinOrAbove]
 
     @action(detail=False, methods=["get"], url_path="morosidad-excel")
     def morosidad_excel(self, request):

@@ -11,8 +11,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django_tenants.utils import schema_context
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from apps.users.permissions import IsAdminJardinOrAbove
 
 from apps.students.models import Guardian
 
@@ -79,7 +80,8 @@ def _resolver_destinatarios(communication):
 
 
 class CommunicationViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    # Comunicaciones masivas a apoderados son solo admin.
+    permission_classes = [IsAdminJardinOrAbove]
     queryset = Communication.objects.select_related("classroom", "enviado_por")
     serializer_class = CommunicationSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -121,7 +123,7 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             })
         return Response({"total": len(data), "destinatarios": data})
 
-    @action(detail=True, methods=["post"], url_path="enviar", permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="enviar", permission_classes=[IsAdminJardinOrAbove])
     def enviar(self, request, pk=None):
         """Envía la comunicación por email a los apoderados con correo registrado."""
         communication = self.get_object()
@@ -180,7 +182,7 @@ class CommunicationViewSet(viewsets.ModelViewSet):
             status=status.HTTP_202_ACCEPTED,
         )
 
-    @action(detail=True, methods=["post"], url_path="whatsapp", permission_classes=[IsAuthenticated])
+    @action(detail=True, methods=["post"], url_path="whatsapp", permission_classes=[IsAdminJardinOrAbove])
     def whatsapp(self, request, pk=None):
         """
         Devuelve enlaces wa.me listos para abrir desde el navegador.

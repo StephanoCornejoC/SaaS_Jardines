@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Layout, Menu, Button, Typography, theme, Avatar, Space } from "antd";
 import {
@@ -18,8 +18,11 @@ import {
   MenuUnfoldOutlined,
   WhatsAppOutlined,
   MailOutlined,
+  GiftOutlined,
 } from "@ant-design/icons";
 import useAuthStore from "../store/authStore";
+import TierExcessBanner from "./TierExcessBanner";
+import PlanBadge from "./PlanBadge";
 
 const { Header, Sider, Content, Footer } = Layout;
 const { Text, Link } = Typography;
@@ -59,7 +62,9 @@ function getJardinDisplayName() {
 // y evitar que la última fila quede tapada por el footer.
 const FOOTER_HEIGHT = 56;
 
-const menuItems = [
+// Menú completo de la directora. La profesora ve solo el ítem "Asistencia"
+// (ver `menuItemsForRole` más abajo).
+const menuItemsAdmin = [
   {
     key: "/dashboard",
     icon: <DashboardOutlined />,
@@ -69,9 +74,10 @@ const menuItems = [
     type: "group",
     label: "Gestión escolar",
     children: [
-      { key: "/alumnos",    icon: <TeamOutlined />,   label: "Alumnos"    },
-      { key: "/profesores", icon: <UserOutlined />,   label: "Profesores" },
-      { key: "/aulas",      icon: <HomeOutlined />,   label: "Aulas"      },
+      { key: "/alumnos",     icon: <TeamOutlined />, label: "Alumnos"          },
+      { key: "/profesores",  icon: <UserOutlined />, label: "Profesores"       },
+      { key: "/aulas",       icon: <HomeOutlined />, label: "Aulas"            },
+      { key: "/cumpleanios", icon: <GiftOutlined />, label: "Cumpleaños del mes" },
     ],
   },
   {
@@ -102,6 +108,19 @@ const menuItems = [
   },
 ];
 
+// Menú reducido del profesor: asistencia + cumpleaños del mes (módulo
+// pensado para que el profesor también pueda saludar a sus alumnos).
+const menuItemsTeacher = [
+  { key: "/asistencia",  icon: <CheckSquareOutlined />, label: "Asistencia"          },
+  { key: "/cumpleanios", icon: <GiftOutlined />,        label: "Cumpleaños del mes" },
+];
+
+function menuItemsForRole(role) {
+  if (role === "TEACHER") return menuItemsTeacher;
+  // ADMIN_JARDIN, SUPERADMIN y cualquier otro caso → menú completo.
+  return menuItemsAdmin;
+}
+
 export default function MainLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
@@ -116,6 +135,25 @@ export default function MainLayout() {
   // mostrar el email del user logueado. Fallback a "Mi jardín" si no hay.
   const jardinName = getJardinDisplayName() || "Mi jardín";
   const userInitials = jardinName.charAt(0).toUpperCase();
+
+  // Rol del usuario logueado. Determina qué ítems del menú se ven y a qué
+  // rutas tiene permitido entrar. Default = ADMIN_JARDIN (compatibilidad
+  // con sesiones existentes que aún no traen el campo `role`).
+  const userRole = user?.role || "ADMIN_JARDIN";
+  const menuItems = menuItemsForRole(userRole);
+
+  // Guard de ruta para profesoras: si están autenticadas como TEACHER y
+  // navegan a una ruta que no es /asistencia (ej. escribieron la URL a
+  // mano o entraron por un link viejo), las llevamos a /asistencia.
+  useEffect(() => {
+    if (userRole !== "TEACHER") return;
+    const allowedPrefixes = ["/asistencia", "/cumpleanios", "/login"];
+    const path = location.pathname;
+    const isAllowed = allowedPrefixes.some((p) => path === p || path.startsWith(`${p}/`));
+    if (!isAllowed) {
+      navigate("/asistencia", { replace: true });
+    }
+  }, [userRole, location.pathname, navigate]);
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -184,11 +222,15 @@ export default function MainLayout() {
             zIndex: 10,
           }}
         >
-          <Button
-            type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
-          />
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <Button
+              type="text"
+              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={() => setCollapsed(!collapsed)}
+            />
+            {/* Plan vigente del jardín — píldora discreta al lado del menú */}
+            <PlanBadge />
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Avatar
               size={32}
@@ -222,6 +264,10 @@ export default function MainLayout() {
             minHeight: 360,
           }}
         >
+          {/* Banner soft-info que aparece SOLO si el jardín superó el límite
+              de alumnos del plan contratado. No bloquea ninguna acción —
+              solo invita a contactar soporte por WhatsApp para upgrade. */}
+          <TierExcessBanner />
           <Outlet />
         </Content>
 

@@ -6,22 +6,38 @@ from django.contrib.admin import ModelAdmin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import Plan, PlatformCost, PlatformInvoice, TenantSubscription
+from .models import Plan, PlatformAlert, PlatformCost, PlatformInvoice, TenantSubscription
 
 
 @admin.register(Plan)
 class PlanAdmin(ModelAdmin):
-    list_display = ("nombre", "precio_mensual", "activo", "creado_at")
-    list_filter = ()
-    list_editable = ("precio_mensual", "activo")
-    search_fields = ("nombre",)
+    list_display = (
+        "nombre",
+        "slug",
+        "rango_alumnos_texto",
+        "precio_mensual",
+        "precio_minimo",
+        "activo",
+    )
+    list_filter = ("activo",)
+    list_editable = ("precio_mensual", "precio_minimo", "activo")
+    search_fields = ("nombre", "slug")
     readonly_fields = ("creado_at", "actualizado_at")
+    ordering = ("alumnos_min",)
 
-    def has_add_permission(self, request):
-        # Solo permitir 1 plan activo. Si ya hay uno, no se crea otro.
-        if Plan.objects.filter(activo=True).exists():
-            return False
-        return super().has_add_permission(request)
+    fieldsets = (
+        ("Identificación", {"fields": ("nombre", "slug", "activo")}),
+        ("Rango de alumnos", {"fields": ("alumnos_min", "alumnos_max")}),
+        ("Precios", {"fields": ("precio_mensual", "precio_minimo")}),
+        ("Auditoría", {
+            "classes": ("collapse",),
+            "fields": ("creado_at", "actualizado_at"),
+        }),
+    )
+
+    @admin.display(description="Rango de alumnos", ordering="alumnos_min")
+    def rango_alumnos_texto(self, obj):
+        return obj.rango_alumnos_texto
 
 
 @admin.register(TenantSubscription)
@@ -30,6 +46,9 @@ class TenantSubscriptionAdmin(ModelAdmin):
         "tenant_link",
         "plan_link",       # ← callable wrapper para que list_display_links lo use
         "precio_acordado",
+        "alumnos_activos_col",
+        "tier_correcto_col",
+        "mismatch_badge",
         "fecha_alta",
         "trial_hasta",
         "estado_badge",
@@ -80,6 +99,48 @@ class TenantSubscriptionAdmin(ModelAdmin):
         return format_html(
             '<span style="background:{};color:white;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600">{}</span>',
             c, obj.get_estado_display(),
+        )
+
+    @admin.display(description="Alumnos activos")
+    def alumnos_activos_col(self, obj):
+        # OJO: este conteo hace schema_context por cada fila. Para 100+
+        # suscripciones puede ser pesado — si en el futuro la pantalla
+        # se vuelve lenta, mover este conteo a un campo denormalizado
+        # actualizado por el cron diario.
+        try:
+            n = obj.tenant.alumnos_activos_count()
+        except Exception:
+            return "—"
+        return n
+
+    @admin.display(description="Tier correcto")
+    def tier_correcto_col(self, obj):
+        try:
+            plan = obj.tenant.tier_correcto()
+        except Exception:
+            return "—"
+        return plan.nombre if plan else "—"
+
+    @admin.display(description="¿Coincide?")
+    def mismatch_badge(self, obj):
+        try:
+            plan_actual = obj.plan
+            plan_correcto = obj.tenant.tier_correcto()
+        except Exception:
+            return "—"
+        if plan_correcto is None:
+            return "—"
+        if plan_actual_id_match := (plan_actual and plan_actual.id == plan_correcto.id):
+            return format_html(
+                '<span style="background:#10b981;color:white;padding:2px 8px;'
+                'border-radius:4px;font-size:11px;font-weight:600">OK</span>'
+            )
+        return format_html(
+            '<span style="background:#f59e0b;color:white;padding:2px 8px;'
+            'border-radius:4px;font-size:11px;font-weight:600" '
+            'title="El jardín creció/decreció de tier. Coordinar upgrade con la directora.">'
+            'Revisar → {}</span>',
+            plan_correcto.nombre,
         )
 
 
@@ -198,4 +259,109 @@ class PlatformCostAdmin(ModelAdmin):
         return format_html(
             '<span style="background:{};color:white;padding:2px 8px;border-radius:4px;font-size:11px">{}</span>',
             c, obj.get_categoria_display(),
+        )
+
+
+@admin.register(PlatformAlert)
+class PlatformAlertAdmin(ModelAdmin):
+    list_display = (
+        "tenant_link",
+        "tipo_badge",
+        "nivel_badge",
+        "titulo",
+        "creado_at",
+        "estado_resolucion_badge",
+    )
+    list_filter = ("tipo", "nivel")
+    search_fields = ("tenant__nombre", "titulo", "mensaje")
+    autocomplete_fields = ("tenant",)
+    readonly_fields = ("creado_at", "actualizado_at", "contexto_pretty")
+    list_per_page = 50
+    actions = ("marcar_como_resueltas",)
+
+    fieldsets = (
+        ("Identificación", {"fields": ("tenant", "tipo", "nivel")}),
+        ("Contenido", {"fields": ("titulo", "mensaje", "contexto_pretty")}),
+        ("Resolución", {"fields": ("resuelta_at", "resuelta_por", "notas_resolucion")}),
+        ("Auditoría", {
+            "classes": ("collapse",),
+            "fields": ("creado_at", "actualizado_at"),
+        }),
+    )
+
+    def get_queryset(self, request):
+        # Por default mostrar primero las abiertas (sin resolver).
+        qs = super().get_queryset(request)
+        return qs.select_related("tenant")
+
+    @admin.display(description="Jardín", ordering="tenant__nombre")
+    def tenant_link(self, obj):
+        url = reverse("admin:tenants_tenant_change", args=[obj.tenant_id])
+        return format_html('<a href="{}">{}</a>', url, obj.tenant.nombre)
+
+    @admin.display(description="Tipo", ordering="tipo")
+    def tipo_badge(self, obj):
+        colors = {
+            "TIER_MISMATCH": "#0ea5e9",
+        }
+        c = colors.get(obj.tipo, "#6b7280")
+        return format_html(
+            '<span style="background:{};color:white;padding:2px 8px;'
+            'border-radius:4px;font-size:11px;font-weight:600">{}</span>',
+            c, obj.get_tipo_display(),
+        )
+
+    @admin.display(description="Nivel", ordering="nivel")
+    def nivel_badge(self, obj):
+        colors = {
+            "INFO": "#3b82f6",
+            "WARNING": "#f59e0b",
+            "CRITICAL": "#ef4444",
+        }
+        c = colors.get(obj.nivel, "#6b7280")
+        return format_html(
+            '<span style="background:{};color:white;padding:2px 8px;'
+            'border-radius:4px;font-size:11px;font-weight:600">{}</span>',
+            c, obj.get_nivel_display(),
+        )
+
+    @admin.display(description="Estado")
+    def estado_resolucion_badge(self, obj):
+        if obj.resuelta_at:
+            return format_html(
+                '<span style="background:#10b981;color:white;padding:2px 8px;'
+                'border-radius:4px;font-size:11px;font-weight:600">Resuelta</span>'
+            )
+        return format_html(
+            '<span style="background:#f59e0b;color:white;padding:2px 8px;'
+            'border-radius:4px;font-size:11px;font-weight:600">Abierta</span>'
+        )
+
+    @admin.display(description="Contexto")
+    def contexto_pretty(self, obj):
+        import json
+        if not obj.contexto:
+            return "(vacío)"
+        try:
+            return format_html(
+                '<pre style="background:#f8fafc;padding:8px;border-radius:6px;'
+                'font-size:12px;max-width:600px;overflow:auto">{}</pre>',
+                json.dumps(obj.contexto, indent=2, ensure_ascii=False),
+            )
+        except Exception:
+            return str(obj.contexto)
+
+    @admin.action(description="Marcar seleccionadas como RESUELTAS")
+    def marcar_como_resueltas(self, request, queryset):
+        from django.utils import timezone
+        ahora = timezone.now()
+        count = queryset.filter(resuelta_at__isnull=True).update(
+            resuelta_at=ahora,
+            resuelta_por=request.user,
+            notas_resolucion="Resuelta manualmente desde el admin.",
+        )
+        self.message_user(
+            request,
+            f"{count} alerta(s) marcada(s) como resuelta(s).",
+            messages.SUCCESS,
         )

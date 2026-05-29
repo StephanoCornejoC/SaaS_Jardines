@@ -7,8 +7,9 @@ from django.db import connection
 from django.db.models import Sum
 from rest_framework import viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from apps.users.permissions import IsAdminJardinOrAbove
 
 from apps.cashflow.models import CashTransaction
 
@@ -56,8 +57,9 @@ def _compute_resumen():
 class DashboardViewSet(viewsets.ViewSet):
     """
     ViewSet para el dashboard. No expone CRUD, solo acciones personalizadas.
+    Solo admin: las profesoras no ven KPIs financieros del jardín.
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminJardinOrAbove]
 
     @action(detail=False, methods=["get"], url_path="resumen")
     def resumen(self, request):

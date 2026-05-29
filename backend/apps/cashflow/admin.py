@@ -237,8 +237,8 @@ class CashTransactionAdmin(ModelAdmin):
     def origen_link(self, obj):
         """Link clickeable al Payment o TeacherPayment que originó esto.
 
-        Cierra el círculo de trazabilidad: desde Caja, vas al pago.
-        Desde el pago, podés navegar al alumno o profesor.
+        Cierra el círculo de trazabilidad: desde Caja, se navega al pago.
+        Desde el pago, se navega al alumno o profesor.
         """
         if obj.referencia_pago_id:
             payment = obj.referencia_pago

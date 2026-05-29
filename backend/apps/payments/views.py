@@ -7,11 +7,11 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.cashflow.models import CashCategory, CashTransaction
 from apps.students.models import Student
+from apps.users.permissions import IsAdminJardinOrAbove
 from shared.validators import validate_month_param, validate_year_param
 
 from .models import MonthlyFee, Payment
@@ -62,7 +62,7 @@ def _ensure_yearly_payments(student, monthly_fee, anio):
 
 
 class PaymentViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminJardinOrAbove]
     queryset = Payment.objects.select_related("student", "monthly_fee")
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ["mes", "anio", "estado", "student"]
@@ -204,7 +204,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
 
 class MonthlyFeeViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminJardinOrAbove]
     queryset = MonthlyFee.objects.select_related("student")
     serializer_class = MonthlyFeeSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]

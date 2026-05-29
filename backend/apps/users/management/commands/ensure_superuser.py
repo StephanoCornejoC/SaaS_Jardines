@@ -7,7 +7,7 @@ y no hace nada.
 Por qué no usamos `createsuperuser --noinput`:
 - El comando default de Django no respeta automáticamente el schema `public`
   cuando django-tenants está activo. Si se ejecuta desde un contexto de tenant
-  el user termina en el schema equivocado y no podés loguearte al Hub.
+  el user termina en el schema equivocado y no se puede iniciar sesión en el Hub.
 - Este comando fuerza explicitamente `schema_context("public")` que es donde
   vive la tabla `users_user` (declarada en SHARED_APPS).
 

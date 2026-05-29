@@ -17,14 +17,24 @@ Diseño:
     los badges cubren los casos reales).
 """
 
+import logging
+import secrets
 from datetime import date
 
 from django.contrib import admin, messages
+from django.contrib.auth import get_user_model
 from django.contrib.admin import ModelAdmin, TabularInline
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.html import format_html
+from django_tenants.utils import schema_context
 
 from .models import Teacher, TeacherContract, TeacherPayment
+
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
 # ---------------------------------------------------------------------------
@@ -121,6 +131,7 @@ class TeacherAdmin(ModelAdmin):
     date_hierarchy = "fecha_ingreso"
     readonly_fields = ("created_at", "updated_at")
     inlines = [ContractInline]
+    actions = ("generar_cuenta_de_acceso",)
 
     fieldsets = (
         ("Identidad", {
@@ -216,6 +227,142 @@ class TeacherAdmin(ModelAdmin):
     @admin.display(description="Email", ordering="email")
     def email_link(self, obj):
         return _mail_link(obj.email)
+
+    # ---- actions ----
+
+    @admin.action(description="Generar cuenta de acceso al sistema")
+    def generar_cuenta_de_acceso(self, request, queryset):
+        """
+        Crea un User con role=TEACHER para cada profesor seleccionado y le
+        envía un email con sus credenciales iniciales.
+
+        Reglas:
+          - Si el profesor ya tiene `user` vinculado, se omite (no se duplica).
+          - Si el profesor no tiene email registrado, se omite con error.
+          - El User se crea en el schema `public` (donde vive users_user
+            como SHARED_APP), no en el schema del tenant.
+          - La contraseña inicial es random (16 chars) — la profesora la
+            cambia en su primer login.
+        """
+        creados = 0
+        omitidos_sin_email = []
+        omitidos_ya_tienen = []
+        errores = []
+
+        for teacher in queryset:
+            if teacher.user_id:
+                omitidos_ya_tienen.append(teacher.nombre_completo)
+                continue
+
+            email = (teacher.email or "").strip()
+            if not email:
+                omitidos_sin_email.append(teacher.nombre_completo)
+                continue
+
+            password = secrets.token_urlsafe(12)
+
+            try:
+                # El User vive en el MISMO schema del tenant — la tabla
+                # users_user existe en cada schema de jardín y la FK
+                # `teacher.user` apunta a esa tabla, no a la del schema
+                # public (donde viven los SUPERADMIN del panel COREM).
+                if User.objects.filter(email=email).exists():
+                    errores.append(
+                        f"{teacher.nombre_completo}: el correo {email} "
+                        f"ya está registrado para otro usuario."
+                    )
+                    continue
+                user = User.objects.create_user(
+                    email=email,
+                    password=password,
+                    first_name=teacher.nombres,
+                    last_name=teacher.apellidos,
+                    role=User.Role.TEACHER,
+                    is_staff=False,
+                    is_superuser=False,
+                )
+
+                teacher.user = user
+                teacher.save(update_fields=["user"])
+
+                # Email de bienvenida a la profesora (texto neutro peruano formal).
+                self._enviar_email_bienvenida(teacher, password)
+                creados += 1
+            except Exception as exc:
+                logger.error(
+                    "generar_cuenta_de_acceso falló para teacher=%s: %s",
+                    teacher.id, exc,
+                )
+                errores.append(f"{teacher.nombre_completo}: {exc}")
+
+        if creados:
+            self.message_user(
+                request,
+                f"Se generaron {creados} cuenta(s) de acceso. "
+                f"Las profesoras recibieron un correo con sus credenciales.",
+                messages.SUCCESS,
+            )
+        for nombre in omitidos_ya_tienen:
+            self.message_user(
+                request,
+                f"{nombre}: ya tiene una cuenta vinculada. Omitido.",
+                messages.WARNING,
+            )
+        for nombre in omitidos_sin_email:
+            self.message_user(
+                request,
+                f"{nombre}: no tiene correo registrado. Agregue el correo "
+                f"primero y vuelva a generar.",
+                messages.WARNING,
+            )
+        for err in errores:
+            self.message_user(request, err, messages.ERROR)
+
+    def _enviar_email_bienvenida(self, teacher, password):
+        """Envía email a la profesora con sus credenciales iniciales.
+
+        Texto en español neutro peruano formal (trato de usted).
+        """
+        from django.conf import settings as dj_settings
+        from django.db import connection
+
+        # URL del frontend del jardín (subdomain del tenant). Si no hay
+        # tenant en contexto, usar fallback.
+        tenant_schema = getattr(connection, "schema_name", "") or ""
+        base_domain = getattr(dj_settings, "TENANT_BASE_DOMAIN", "miniddo.com")
+        if tenant_schema and tenant_schema not in ("public", "info"):
+            frontend_url = f"https://{tenant_schema}.{base_domain}"
+        else:
+            frontend_url = f"https://{base_domain}"
+
+        asunto = "Acceso al sistema de gestión del jardín"
+        cuerpo_texto = (
+            f"Hola {teacher.nombres},\n\n"
+            f"La dirección del jardín le ha generado una cuenta para acceder "
+            f"al sistema de gestión y registrar la asistencia de sus alumnos.\n\n"
+            f"Credenciales iniciales:\n"
+            f"  Correo:     {teacher.email}\n"
+            f"  Contraseña: {password}\n\n"
+            f"Para iniciar sesión, ingrese a:\n"
+            f"  {frontend_url}\n\n"
+            f"Le recomendamos cambiar la contraseña después del primer ingreso.\n\n"
+            f"Si tiene alguna duda, comuníquese con la dirección del jardín.\n\n"
+            f"Saludos,\n"
+            f"Equipo Miniddo"
+        )
+        try:
+            send_mail(
+                subject=asunto,
+                message=cuerpo_texto,
+                from_email=getattr(dj_settings, "DEFAULT_FROM_EMAIL", "noreply@miniddo.com"),
+                recipient_list=[teacher.email],
+                fail_silently=False,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Email de bienvenida falló para teacher=%s (%s): %s",
+                teacher.id, teacher.email, exc,
+            )
 
 
 # ---------------------------------------------------------------------------

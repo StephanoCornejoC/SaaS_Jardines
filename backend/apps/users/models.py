@@ -17,6 +17,7 @@ class User(AbstractUser):
     class Role(models.TextChoices):
         SUPERADMIN = "SUPERADMIN", "Superadmin"
         ADMIN_JARDIN = "ADMIN_JARDIN", "Admin Jardín"
+        TEACHER = "TEACHER", "Profesor"
 
     # Eliminar username, usar email como identificador
     username = None

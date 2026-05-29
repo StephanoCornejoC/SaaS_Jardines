@@ -472,7 +472,7 @@ export default function Sueldos() {
           type="secondary"
           style={{ fontSize: 12, display: "block", marginBottom: 12 }}
         >
-          El monto se pre-llena con el sueldo del contrato pero podés editarlo
+          El monto se pre-llena con el sueldo del contrato pero puede editarlo
           si hay bono o ajuste. Al confirmar, el pago queda registrado en el
           flujo de caja como EGRESO.
         </Text>

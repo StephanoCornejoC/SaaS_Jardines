@@ -18,6 +18,7 @@ const Attendance = lazy(() => import("./pages/Attendance"));
 const Communications = lazy(() => import("./pages/Communications"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Migrations = lazy(() => import("./pages/Migrations"));
+const Cumpleanios = lazy(() => import("./pages/Cumpleanios"));
 
 function PrivateRoute({ children }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="comunicaciones" element={<Communications />} />
           <Route path="reportes" element={<Reports />} />
           <Route path="migracion" element={<Migrations />} />
+          <Route path="cumpleanios" element={<Cumpleanios />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
       </Routes>

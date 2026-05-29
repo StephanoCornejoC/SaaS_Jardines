@@ -367,7 +367,7 @@ export default function Teachers() {
           </div>
           <Text type="secondary" style={{ fontSize: 11, display: "block", marginTop: -8, marginBottom: 8 }}>
             El sueldo se usa en el módulo "Sueldos" para pre-llenar cada pago mensual.
-            Podés modificarlo cuando lo necesites.
+            Puede modificarlo cuando lo necesite.
           </Text>
         </Form>
       </Modal>

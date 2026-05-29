@@ -3,34 +3,106 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 
 
 class Plan(models.Model):
-    """Único plan del SaaS. Se mantiene como modelo para tener histórico
-    de cambios de precio. Solo debería existir 1 fila marcada como activa."""
+    """
+    Planes del SaaS escalonados por cantidad de alumnos del jardín.
 
-    nombre = models.CharField(max_length=80, default="Plan COREM")
+    DECISIÓN ESTRATÉGICA (28-may-2026):
+    Todos los planes (Mini / Plus / Pro / Max) entregan EXACTAMENTE las
+    mismas funcionalidades del SaaS. La diferencia entre tiers es solo el
+    rango de alumnos y el precio. No hay gating de módulos por plan.
+
+    Esto contradice el roadmap previo de features diferenciadas — esa
+    decisión quedó obsoleta. Razones del cambio:
+    - El producto completo desde día 1 es mejor gancho comercial
+    - Cero gating en código (sin lógica "este plan puede / no puede")
+    - La directora no piensa "qué pierdo" sino "qué obtengo por el precio"
+
+    El precio público (`precio_mensual`) y el piso negociable (`precio_minimo`)
+    definen un rango: el `precio_acordado` de cada TenantSubscription puede
+    ser CUALQUIER valor entre ambos, no solo los extremos. Negociación caso
+    por caso por parte de soporte/ventas.
+    """
+
+    SLUG_MINI = "mini"
+    SLUG_PLUS = "plus"
+    SLUG_PRO = "pro"
+    SLUG_MAX = "max"
+
+    nombre = models.CharField(max_length=80)
+    slug = models.SlugField(
+        max_length=20,
+        unique=True,
+        help_text="Identificador único en código (mini, plus, pro, max).",
+    )
+    alumnos_min = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="Cantidad mínima de alumnos activos para que aplique este plan.",
+    )
+    alumnos_max = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Cantidad máxima de alumnos activos. Dejar vacío significa sin límite.",
+    )
     precio_mensual = models.DecimalField(
         max_digits=8,
         decimal_places=2,
-        default=Decimal("120.00"),
-        help_text="Precio mensual por jardín en soles",
+        help_text="Precio público del plan en soles. Es el precio que se muestra en marketing.",
     )
-    activo = models.BooleanField(default=True)
+    precio_minimo = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        help_text="Piso negociable. Soporte interno NO debe cerrar ventas por debajo de este monto.",
+    )
+    activo = models.BooleanField(
+        default=True,
+        help_text="Si está desactivado, no se asigna a jardines nuevos. Los jardines existentes lo conservan.",
+    )
     creado_at = models.DateTimeField(auto_now_add=True)
     actualizado_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Plan"
-        verbose_name_plural = "Plan / Configuración"
-        ordering = ("-activo", "-creado_at")
+        verbose_name_plural = "Planes"
+        ordering = ("alumnos_min",)
 
     def __str__(self):
         return f"{self.nombre} (S/ {self.precio_mensual}/mes)"
 
+    @property
+    def rango_alumnos_texto(self):
+        if self.alumnos_max is None:
+            return f"{self.alumnos_min}+ alumnos"
+        return f"{self.alumnos_min}–{self.alumnos_max} alumnos"
+
+    def cubre(self, n_alumnos: int) -> bool:
+        """¿Este plan aplica a un jardín con n_alumnos activos?"""
+        if n_alumnos < self.alumnos_min:
+            return False
+        if self.alumnos_max is not None and n_alumnos > self.alumnos_max:
+            return False
+        return True
+
     @classmethod
-    def vigente(cls):
-        return cls.objects.filter(activo=True).order_by("-creado_at").first()
+    def por_alumnos(cls, n_alumnos: int):
+        """
+        Retorna el Plan activo que corresponde a `n_alumnos` activos.
+
+        Sustituye al antiguo `Plan.vigente()` (que devolvía un único plan
+        global). Ahora la respuesta depende del tamaño del jardín.
+
+        Si no encuentra match (ej. n_alumnos=0 y el tier Mini empieza en 1),
+        devuelve el plan con `alumnos_min` más bajo entre los activos.
+        """
+        n = max(0, int(n_alumnos))
+        qs = cls.objects.filter(activo=True).order_by("alumnos_min")
+        for plan in qs:
+            if plan.cubre(n):
+                return plan
+        return qs.first()
 
 
 class TenantSubscription(models.Model):
@@ -57,7 +129,11 @@ class TenantSubscription(models.Model):
     precio_acordado = models.DecimalField(
         max_digits=8,
         decimal_places=2,
-        help_text="Precio negociado para este jardín. Default = precio del plan.",
+        help_text=(
+            "Precio negociado para este jardín. Puede ser CUALQUIER valor "
+            "entre el precio_minimo y el precio_mensual del plan asignado. "
+            "Default al crearse: precio_mensual del plan."
+        ),
     )
     fecha_alta = models.DateField(default=date.today)
     trial_hasta = models.DateField(
@@ -83,6 +159,36 @@ class TenantSubscription(models.Model):
 
     def en_trial(self):
         return self.trial_hasta and date.today() <= self.trial_hasta
+
+    def clean(self):
+        """Valida que el precio_acordado esté dentro del rango del plan.
+
+        Permite cualquier valor entre `plan.precio_minimo` y
+        `plan.precio_mensual` (ambos inclusive). Soporte que intente cerrar
+        ventas por debajo del piso ve un error de validación en el admin.
+        """
+        from django.core.exceptions import ValidationError
+        super().clean()
+        if self.plan_id and self.precio_acordado is not None:
+            piso = self.plan.precio_minimo
+            techo = self.plan.precio_mensual
+            if self.precio_acordado < piso:
+                raise ValidationError({
+                    "precio_acordado": (
+                        f"El precio acordado (S/{self.precio_acordado}) está por "
+                        f"debajo del piso negociable del plan {self.plan.nombre} "
+                        f"(S/{piso}). Para casos especiales, modificar el "
+                        f"precio_minimo del plan o crear un acuerdo explícito."
+                    ),
+                })
+            if self.precio_acordado > techo:
+                raise ValidationError({
+                    "precio_acordado": (
+                        f"El precio acordado (S/{self.precio_acordado}) supera "
+                        f"el precio público del plan {self.plan.nombre} "
+                        f"(S/{techo}). ¿Quisiste asignar otro plan?"
+                    ),
+                })
 
     def save(self, *args, **kwargs):
         if not self.trial_hasta:
@@ -182,3 +288,82 @@ class PlatformCost(models.Model):
 
     def __str__(self):
         return f"{self.concepto} — S/ {self.monto} ({self.fecha})"
+
+
+class PlatformAlert(models.Model):
+    """
+    Alertas operativas del SaaS visibles solo para el SUPERADMIN.
+
+    Las alertas NO son user-facing — sirven para que soporte interno detecte
+    situaciones que requieren acción humana (ej. un jardín que creció de tier
+    y hay que coordinar el upgrade con la directora por WhatsApp).
+
+    Idempotencia: solo puede existir una alerta abierta (sin resolver) por
+    cada par (tenant, tipo). El cron diario actualiza la existente en lugar
+    de crear duplicados. Cuando soporte resuelve la alerta, se marca con
+    `resuelta_at` y la próxima detección crea una nueva si vuelve a aplicar.
+    """
+
+    class Tipo(models.TextChoices):
+        TIER_MISMATCH = "TIER_MISMATCH", "Tier desactualizado"
+        # Reservar slots para alertas futuras:
+        # MORA_PROLONGADA = "MORA_PROLONGADA", "Mora prolongada"
+        # SIN_ACTIVIDAD   = "SIN_ACTIVIDAD",   "Sin actividad"
+
+    class Nivel(models.TextChoices):
+        INFO = "INFO", "Informativo"
+        WARNING = "WARNING", "Advertencia"
+        CRITICAL = "CRITICAL", "Crítico"
+
+    tenant = models.ForeignKey(
+        "tenants.Tenant",
+        on_delete=models.CASCADE,
+        related_name="alertas",
+        verbose_name="Jardín",
+    )
+    tipo = models.CharField(max_length=30, choices=Tipo.choices)
+    nivel = models.CharField(max_length=10, choices=Nivel.choices, default=Nivel.INFO)
+    titulo = models.CharField(max_length=200)
+    mensaje = models.TextField()
+    contexto = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text=(
+            "Datos estructurados de la alerta. Para TIER_MISMATCH: "
+            "{plan_actual, tier_correcto, alumnos_activos}."
+        ),
+    )
+    creado_at = models.DateTimeField(auto_now_add=True)
+    actualizado_at = models.DateTimeField(auto_now=True)
+    resuelta_at = models.DateTimeField(null=True, blank=True)
+    resuelta_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="alertas_resueltas",
+    )
+    notas_resolucion = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Alerta del SaaS"
+        verbose_name_plural = "Alertas del SaaS"
+        ordering = ("-creado_at",)
+        constraints = [
+            # Solo una alerta abierta (sin resolver) por par (tenant, tipo).
+            # Cuando se resuelve (resuelta_at no nulo) puede existir otra
+            # del mismo tipo para el mismo tenant.
+            models.UniqueConstraint(
+                fields=("tenant", "tipo"),
+                condition=Q(resuelta_at__isnull=True),
+                name="unique_open_alert_per_tenant_type",
+            ),
+        ]
+
+    def __str__(self):
+        estado = "ABIERTA" if self.resuelta_at is None else "RESUELTA"
+        return f"[{estado}] {self.get_tipo_display()} · {self.tenant.nombre}"
+
+    @property
+    def esta_resuelta(self) -> bool:
+        return self.resuelta_at is not None

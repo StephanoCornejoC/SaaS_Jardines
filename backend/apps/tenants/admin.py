@@ -239,10 +239,21 @@ class TenantAdmin(ModelAdmin):
         Domain.objects.create(
             domain=data["dominio"], tenant=tenant, is_primary=True
         )
-        # 3. Crear suscripción con trial 1 mes
-        plan = Plan.vigente()
+        # 3. Crear suscripción con trial 1 mes.
+        # Un jardín nuevo arranca sin alumnos cargados → tier Mini por default.
+        # Cuando la directora carga alumnos durante el trial, el tier real se
+        # recalcula al cerrar el trial; soporte interno puede actualizarlo
+        # manualmente desde el admin si conviene cobrar otro tier desde el
+        # día 1.
+        plan = Plan.por_alumnos(0)
         if not plan:
-            plan = Plan.objects.create(nombre="Plan COREM", precio_mensual="120.00", activo=True)
+            # Edge case: ningún Plan activo. Avisa para que se corrija la
+            # configuración antes de que el admin crashee.
+            raise RuntimeError(
+                "No hay planes activos en la base. "
+                "Corre la migración platform/0003_plan_tiers o crea los planes "
+                "manualmente antes de dar de alta un jardín."
+            )
         TenantSubscription.objects.create(
             tenant=tenant,
             plan=plan,

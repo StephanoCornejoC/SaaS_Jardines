@@ -71,6 +71,32 @@ class MedicalRecordSerializer(serializers.ModelSerializer):
         read_only_fields = ("id",)
 
 
+class StudentForTeacherSerializer(serializers.ModelSerializer):
+    """
+    Serializer "lite" para que profesores vean alumnos sin datos sensibles.
+
+    Solo lo necesario para tomar asistencia: nombre, foto, aula. NO incluye
+    DNI, apoderados, ficha médica, fecha de ingreso ni nada que la profesora
+    no necesite para su tarea.
+    """
+
+    classroom_nombre = serializers.CharField(
+        source="classroom.nombre", read_only=True, default=None
+    )
+
+    class Meta:
+        model = Student
+        fields = (
+            "id",
+            "nombres",
+            "apellidos",
+            "foto",
+            "classroom",
+            "classroom_nombre",
+            "estado",
+        )
+
+
 class StudentListSerializer(serializers.ModelSerializer):
     edad = serializers.IntegerField(read_only=True)
     classroom_nombre = serializers.CharField(

@@ -24,7 +24,9 @@ from .serializers import (
 
 
 class TeacherViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    # Solo admin: una profesora no puede modificarse a sí misma ni ver
+    # contratos/sueldos de colegas.
+    permission_classes = [IsAdminJardinOrAbove]
     queryset = Teacher.objects.prefetch_related("contracts__payments")
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["nombres", "apellidos", "dni"]
@@ -337,6 +339,7 @@ class TeacherViewSet(viewsets.ModelViewSet):
 
 
 class TeacherContractViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminJardinOrAbove]
     serializer_class = TeacherContractSerializer
 
     def get_queryset(self):
@@ -350,6 +353,7 @@ class TeacherContractViewSet(viewsets.ModelViewSet):
 
 
 class TeacherPaymentViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminJardinOrAbove]
     serializer_class = TeacherPaymentSerializer
 
     def get_queryset(self):

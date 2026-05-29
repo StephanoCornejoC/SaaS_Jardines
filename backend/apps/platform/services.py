@@ -13,7 +13,7 @@ from django.db.models import Count, Q, Sum
 
 from apps.tenants.models import Tenant
 
-from .models import Plan, PlatformCost, PlatformInvoice, TenantSubscription
+from .models import Plan, PlatformAlert, PlatformCost, PlatformInvoice, TenantSubscription
 
 logger = logging.getLogger(__name__)
 
@@ -242,9 +242,12 @@ def metricas_dashboard():
         estado=TenantSubscription.Estado.BLOQUEADA
     ).count()
 
-    # Plan vigente
-    plan = Plan.vigente()
-    precio_default = plan.precio_mensual if plan else Decimal("0.00")
+    # Precio de referencia para el dashboard: tomamos el tier Plus como
+    # "precio típico" (es el tier que mejor representa el ICP 41-70 alumnos).
+    # Antes existía un único Plan global, ahora son 4 tiers y `precio_default`
+    # se mantiene solo para compatibilidad del template del dashboard.
+    plan_ref = Plan.objects.filter(slug=Plan.SLUG_PLUS, activo=True).first()
+    precio_default = plan_ref.precio_mensual if plan_ref else Decimal("0.00")
 
     # MRR estimado: suma de precios acordados de suscripciones que ya pasaron trial
     mrr = activos_qs.exclude(trial_hasta__gte=today).aggregate(
@@ -350,6 +353,123 @@ def procesar_trials_vencidos(today=None, dry_run=False):
     if finalizados:
         logger.info(f"Trials finalizados: {len(finalizados)}")
     return {"count": len(finalizados), "items": finalizados}
+
+
+def detectar_tier_mismatches(dry_run=False):
+    """
+    Recorre las suscripciones ACTIVAS y compara el plan asignado contra el
+    tier que correspondería según la cantidad actual de alumnos activos.
+
+    Si hay mismatch, asegura que exista una `PlatformAlert` ABIERTA del tipo
+    TIER_MISMATCH para ese tenant. Si ya existe una abierta, actualiza su
+    contexto y mensaje (no duplica). Si el mismatch se resolvió desde la
+    última corrida (el SUPERADMIN cambió el plan a mano), cierra la alerta
+    abierta automáticamente.
+
+    NO cambia automáticamente el plan ni envía email a la directora. La
+    intervención sigue siendo humana: el SUPERADMIN ve la alerta en el
+    admin y coordina con la directora por WhatsApp.
+
+    Returns: {"revisadas": N, "creadas": M, "actualizadas": K, "cerradas": L}
+    """
+    qs = TenantSubscription.objects.filter(
+        estado=TenantSubscription.Estado.ACTIVA,
+    ).select_related("tenant", "plan")
+
+    stats = {"revisadas": 0, "creadas": 0, "actualizadas": 0, "cerradas": 0}
+    nivel_por_default = PlatformAlert.Nivel.WARNING
+
+    for sub in qs:
+        stats["revisadas"] += 1
+        tenant = sub.tenant
+        try:
+            n_alumnos = tenant.alumnos_activos_count()
+            tier_correcto = tenant.tier_correcto()
+        except Exception as e:
+            logger.warning(
+                f"No se pudo evaluar tier para tenant {tenant.schema_name}: {e}"
+            )
+            continue
+
+        if tier_correcto is None:
+            continue
+
+        existe_mismatch = sub.plan_id != tier_correcto.id
+
+        alerta_abierta = PlatformAlert.objects.filter(
+            tenant=tenant,
+            tipo=PlatformAlert.Tipo.TIER_MISMATCH,
+            resuelta_at__isnull=True,
+        ).first()
+
+        if not existe_mismatch:
+            # El plan actual coincide con el tier correcto. Si había una
+            # alerta abierta, cerrarla (soporte ya hizo el upgrade).
+            if alerta_abierta and not dry_run:
+                from django.utils import timezone
+                alerta_abierta.resuelta_at = timezone.now()
+                alerta_abierta.notas_resolucion = (
+                    "Cerrada automáticamente: el plan asignado ya coincide "
+                    "con el tier correcto."
+                )
+                alerta_abierta.save(
+                    update_fields=["resuelta_at", "notas_resolucion", "actualizado_at"]
+                )
+                stats["cerradas"] += 1
+            continue
+
+        # Hay mismatch real: crear o actualizar la alerta abierta.
+        contexto = {
+            "plan_actual_slug": sub.plan.slug if sub.plan else None,
+            "plan_actual_nombre": sub.plan.nombre if sub.plan else None,
+            "tier_correcto_slug": tier_correcto.slug,
+            "tier_correcto_nombre": tier_correcto.nombre,
+            "alumnos_activos": n_alumnos,
+            "precio_acordado_actual": str(sub.precio_acordado),
+            "precio_publico_tier_correcto": str(tier_correcto.precio_mensual),
+            "precio_minimo_tier_correcto": str(tier_correcto.precio_minimo),
+        }
+        direccion = "upgrade" if n_alumnos > (sub.plan.alumnos_max or 10**9) else "downgrade"
+        titulo = (
+            f"{tenant.nombre}: corresponde {direccion} a {tier_correcto.nombre}"
+        )
+        mensaje = (
+            f"El jardín tiene {n_alumnos} alumnos activos. "
+            f"Plan actual: {sub.plan.nombre} (rango {sub.plan.rango_alumnos_texto}). "
+            f"Tier correcto: {tier_correcto.nombre} (rango {tier_correcto.rango_alumnos_texto}, "
+            f"precio público S/{tier_correcto.precio_mensual}, piso S/{tier_correcto.precio_minimo}). "
+            f"Coordinar con la directora por WhatsApp antes de cambiar el plan."
+        )
+
+        if dry_run:
+            continue
+
+        if alerta_abierta:
+            alerta_abierta.contexto = contexto
+            alerta_abierta.titulo = titulo
+            alerta_abierta.mensaje = mensaje
+            alerta_abierta.nivel = nivel_por_default
+            alerta_abierta.save(
+                update_fields=["contexto", "titulo", "mensaje", "nivel", "actualizado_at"]
+            )
+            stats["actualizadas"] += 1
+        else:
+            PlatformAlert.objects.create(
+                tenant=tenant,
+                tipo=PlatformAlert.Tipo.TIER_MISMATCH,
+                nivel=nivel_por_default,
+                titulo=titulo,
+                mensaje=mensaje,
+                contexto=contexto,
+            )
+            stats["creadas"] += 1
+
+    if stats["creadas"] or stats["actualizadas"] or stats["cerradas"]:
+        logger.info(
+            f"Tier mismatches: {stats['creadas']} creadas · "
+            f"{stats['actualizadas']} actualizadas · {stats['cerradas']} cerradas"
+        )
+    return stats
 
 
 def emitir_cobros_del_dia(today=None, dry_run=False, dias_para_vencer=10, send_email=True):

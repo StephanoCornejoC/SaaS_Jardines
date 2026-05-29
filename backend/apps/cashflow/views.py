@@ -3,9 +3,9 @@ from datetime import date
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.users.permissions import IsAdminJardinOrAbove
 from shared.validators import validate_date_param, validate_month_param, validate_year_param
 
 from .models import CashCategory, CashTransaction, MonthlyClosure
@@ -19,7 +19,7 @@ from .services import close_month, get_cashflow_summary
 
 
 class CashCategoryViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminJardinOrAbove]
     queryset = CashCategory.objects.all()
     serializer_class = CashCategorySerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
@@ -28,7 +28,7 @@ class CashCategoryViewSet(viewsets.ModelViewSet):
 
 
 class CashTransactionViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminJardinOrAbove]
     queryset = CashTransaction.objects.select_related(
         "categoria", "referencia_pago", "referencia_teacher_payment"
     )
@@ -96,7 +96,7 @@ class CashTransactionViewSet(viewsets.ModelViewSet):
 
 
 class MonthlyClosureViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAdminJardinOrAbove]
     queryset = MonthlyClosure.objects.select_related("cerrado_por")
     serializer_class = MonthlyClosureSerializer
     filter_backends = [DjangoFilterBackend]

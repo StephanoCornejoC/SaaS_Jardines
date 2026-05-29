@@ -4,10 +4,11 @@ from django.db.models import Count, Q
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 
 from apps.classrooms.models import Classroom
+from apps.users.permissions import IsTeacherOrAdmin
 
 from .models import Attendance
 from .serializers import (
@@ -17,8 +18,26 @@ from .serializers import (
 )
 
 
+def _es_teacher(user):
+    return user and user.is_authenticated and getattr(user, "role", None) == "TEACHER"
+
+
+def _validar_fecha_teacher(user, fecha):
+    """
+    Bloquea a TEACHER de registrar/modificar asistencia de un día que no
+    sea el de HOY. Errores de días anteriores los corrige la directora.
+    """
+    if _es_teacher(user) and fecha != date.today():
+        raise PermissionDenied(
+            "Como profesor solo puede registrar o modificar asistencia del día actual. "
+            "Si necesita corregir una fecha anterior, contacte a la directora."
+        )
+
+
 class AttendanceViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    # TEACHER + ADMIN. La restricción de "solo día actual" para TEACHER se
+    # aplica explícitamente en cada acción de escritura más abajo.
+    permission_classes = [IsTeacherOrAdmin]
     queryset = Attendance.objects.select_related(
         "student", "classroom", "registrado_por"
     )
@@ -27,6 +46,21 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     filterset_fields = ["classroom", "fecha", "estado"]
     ordering_fields = ["fecha", "created_at"]
     ordering = ["-fecha"]
+
+    def perform_create(self, serializer):
+        _validar_fecha_teacher(self.request.user, serializer.validated_data.get("fecha"))
+        serializer.save()
+
+    def perform_update(self, serializer):
+        # En update la fecha puede venir o no — validamos contra la
+        # instance.fecha si no llega un override.
+        fecha = serializer.validated_data.get("fecha", serializer.instance.fecha)
+        _validar_fecha_teacher(self.request.user, fecha)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        _validar_fecha_teacher(self.request.user, instance.fecha)
+        instance.delete()
 
     @action(detail=False, methods=["post"], url_path="registro-masivo")
     def registro_masivo(self, request):
@@ -40,6 +74,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         classroom_id = serializer.validated_data["classroom_id"]
         fecha = serializer.validated_data["fecha"]
         asistencias = serializer.validated_data["asistencias"]
+
+        # TEACHER solo puede registrar masivamente la fecha de hoy.
+        _validar_fecha_teacher(request.user, fecha)
 
         try:
             classroom = Classroom.objects.get(pk=classroom_id)

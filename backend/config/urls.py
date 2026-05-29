@@ -33,6 +33,7 @@ urlpatterns = [
     path("api/v1/dashboard/", include("apps.dashboard.urls")),
     path("api/v1/reports/", include("apps.reports.urls")),
     path("api/v1/migrations/", include("apps.migrations_academic.urls")),
+    path("api/v1/platform/", include("apps.platform.urls")),
     # SECURITY [VULN-008]: Media files served through authenticated view.
     # Student photos, QR codes, etc. require JWT auth. Never use Django's
     # static() helper for media in any environment.

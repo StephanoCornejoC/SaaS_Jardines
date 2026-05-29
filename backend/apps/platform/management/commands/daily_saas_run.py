@@ -43,6 +43,7 @@ from django.db import connection
 from django_tenants.utils import schema_context
 
 from apps.platform.services import (
+    detectar_tier_mismatches,
     emitir_cobros_del_dia,
     notificar_superadmin_resumen,
     procesar_trials_vencidos,
@@ -95,7 +96,23 @@ class Command(BaseCommand):
                     f"{morosidad['reactivadas']} reactivadas"
                 )
 
-            resumen = {"trials": trials, "cobros": cobros, "morosidad": morosidad}
+            # Detección de mismatches de tier: tenants cuyo plan asignado no
+            # coincide con el tier que correspondería según alumnos activos.
+            # Sin envío de email — solo genera alertas internas para soporte.
+            mismatches = detectar_tier_mismatches(dry_run=dry_run)
+            self.stdout.write(
+                f"  Tier mismatches: {mismatches['revisadas']} suscripciones revisadas · "
+                f"{mismatches['creadas']} alertas nuevas · "
+                f"{mismatches['actualizadas']} actualizadas · "
+                f"{mismatches['cerradas']} cerradas"
+            )
+
+            resumen = {
+                "trials": trials,
+                "cobros": cobros,
+                "morosidad": morosidad,
+                "tier_mismatches": mismatches,
+            }
             notif = notificar_superadmin_resumen(resumen, dry_run=dry_run)
             if notif.get("sent"):
                 self.stdout.write(f"  Resumen enviado a {notif['to']}")

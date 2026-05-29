@@ -1,7 +1,8 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from apps.users.permissions import IsAdminJardinOrAbove
 
 from .models import AcademicMigration
 from .serializers import (
@@ -12,7 +13,8 @@ from .services import cleanup_graduated, execute_migration, preview_migration
 
 
 class AcademicMigrationViewSet(viewsets.ReadOnlyModelViewSet):
-    permission_classes = [IsAuthenticated]
+    # Migración anual de alumnos = decisión de directora, no de profesoras.
+    permission_classes = [IsAdminJardinOrAbove]
     queryset = AcademicMigration.objects.prefetch_related(
         "details__student", "details__aula_origen", "details__aula_destino"
     ).select_related("ejecutado_por")
