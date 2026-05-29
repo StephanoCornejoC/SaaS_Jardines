@@ -146,22 +146,25 @@ class Migration(migrations.Migration):
 
     operations = [
         # 0. Limpieza defensiva de residuos de intentos previos.
-        # SlugField fuerza db_index=True por default, lo que generaba el
-        # índice secundario `_d4ad4e10` Y el `_d4ad4e10_like` desde el
-        # AddField inicial. Después el AlterField unique=True intentaba
-        # recrear el `_like`, generando `DuplicateTable`. La lista cubre
-        # los 3 índices que SlugField + unique pueden dejar:
-        #   - <table>_<col>_<hash>          ← db_index implícito
-        #   - <table>_<col>_<hash>_like     ← varchar_pattern_ops
-        #   - <table>_<col>_<hash>_uniq     ← UNIQUE constraint
-        # más el legacy `_key` y la columna entera por si quedaron.
+        # IMPORTANTE: el `_uniq` NO es solo un índice — es el índice
+        # subyacente de una UNIQUE CONSTRAINT. Postgres rechaza
+        # `DROP INDEX platform_plan_slug_*_uniq` con
+        # `DependentObjectsStillExist: ... requires it`. Hay que dropear la
+        # CONSTRAINT primero (lo cual cae el índice asociado en cascada).
+        # El orden importa: constraint primero, después los índices puros.
         migrations.RunSQL(
             sql=[
+                # Constraints (incluyen su índice subyacente automáticamente)
+                "ALTER TABLE platform_plan DROP CONSTRAINT IF EXISTS platform_plan_slug_d4ad4e10_uniq;",
+                "ALTER TABLE platform_plan DROP CONSTRAINT IF EXISTS platform_plan_slug_key;",
+                # Índices estándar (db_index implícito + varchar_pattern_ops)
                 "DROP INDEX IF EXISTS platform_plan_slug_d4ad4e10;",
                 "DROP INDEX IF EXISTS platform_plan_slug_d4ad4e10_like;",
-                "DROP INDEX IF EXISTS platform_plan_slug_d4ad4e10_uniq;",
-                "DROP INDEX IF EXISTS platform_plan_slug_key;",
-                "ALTER TABLE platform_plan DROP COLUMN IF EXISTS slug;",
+                # Columnas que esta migración agrega; si quedaron de un
+                # intento previo las recreamos limpias en los AddField
+                # siguientes. El CASCADE en DROP COLUMN se aplica solo a
+                # índices/constraints de esa columna específicamente.
+                "ALTER TABLE platform_plan DROP COLUMN IF EXISTS slug CASCADE;",
                 "ALTER TABLE platform_plan DROP COLUMN IF EXISTS alumnos_min;",
                 "ALTER TABLE platform_plan DROP COLUMN IF EXISTS alumnos_max;",
                 "ALTER TABLE platform_plan DROP COLUMN IF EXISTS precio_minimo;",
