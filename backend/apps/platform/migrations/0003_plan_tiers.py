@@ -76,6 +76,14 @@ def poblar_planes(apps, schema_editor):
     # Recién ahora podemos borrar los planes viejos
     Plan.objects.filter(id__in=plan_ids_a_borrar).delete()
 
+    # FK PROTECT entre TenantSubscription.plan y Plan deja constraint checks
+    # diferidos en la transacción de migración. Si no los drenamos acá, el
+    # siguiente AlterField sobre platform_plan falla con
+    # `psycopg2.errors.ObjectInUse: cannot ALTER TABLE ... because it has
+    # pending trigger events`. SET CONSTRAINTS ALL IMMEDIATE evalúa los
+    # checks ya mismo y los limpia, dejando la tabla lista para ALTER.
+    schema_editor.execute("SET CONSTRAINTS ALL IMMEDIATE;")
+
 
 def revertir_planes(apps, schema_editor):
     Plan = apps.get_model("platform", "Plan")
@@ -108,15 +116,26 @@ class Migration(migrations.Migration):
         ("platform", "0002_alter_platformcost_options_platformcost_company_and_more"),
     ]
 
+    # OJO con el orden de operations en Postgres + django-tenants:
+    # si se hace AddField(unique=True) seguido de cualquier AlterField sobre
+    # la misma tabla, Postgres queda con "pending trigger events" del UNIQUE
+    # INDEX recién creado y rechaza el ALTER TABLE con
+    # `psycopg2.errors.ObjectInUse: cannot ALTER TABLE ... because it has
+    # pending trigger events`.
+    #
+    # Solución: el slug se agrega primero como NULL y SIN unique, la RunPython
+    # puebla los valores, y recién al final un AlterField lo marca como
+    # unique=True NOT NULL. Lo mismo para precio_minimo (NOT NULL al final).
+
     operations = [
-        # 1. Add fields nuevos con nullable para no romper filas existentes
+        # 1. Add fields nuevos sin constraints fuertes — todos nullable o con
+        # default. Esto NO crea índices unique todavía.
         migrations.AddField(
             model_name="plan",
             name="slug",
             field=models.SlugField(
                 max_length=20,
                 null=True,
-                unique=True,
                 help_text="Identificador único en código (mini, plus, pro, max).",
             ),
         ),
@@ -147,8 +166,33 @@ class Migration(migrations.Migration):
                 help_text="Piso negociable. Soporte interno NO debe cerrar ventas por debajo de este monto.",
             ),
         ),
-        # 2. Quitar el default del nombre y de precio_mensual (los 4 tiers
-        # nuevos deben definir su propio nombre y precio explícitamente)
+        # 2. Borrar planes viejos, crear 4 tiers con slugs únicos, reasignar
+        # suscripciones existentes.
+        migrations.RunPython(poblar_planes, revertir_planes),
+        # 3. Ahora que los datos están cargados y los slugs son únicos,
+        # marcamos slug como unique=True NOT NULL y precio_minimo como NOT NULL.
+        # Estos AlterField van DESPUÉS del RunPython y no causan conflicto
+        # con pending events porque el data fill ya completó.
+        migrations.AlterField(
+            model_name="plan",
+            name="slug",
+            field=models.SlugField(
+                max_length=20,
+                unique=True,
+                help_text="Identificador único en código (mini, plus, pro, max).",
+            ),
+        ),
+        migrations.AlterField(
+            model_name="plan",
+            name="precio_minimo",
+            field=models.DecimalField(
+                max_digits=8,
+                decimal_places=2,
+                help_text="Piso negociable. Soporte interno NO debe cerrar ventas por debajo de este monto.",
+            ),
+        ),
+        # 4. Cambios cosmeticos (quita defaults, agrega help_text) — al final,
+        # cuando ya no hay constraints pendientes que afecten ALTER TABLE.
         migrations.AlterField(
             model_name="plan",
             name="nombre",
@@ -172,28 +216,6 @@ class Migration(migrations.Migration):
                     "Si está desactivado, no se asigna a jardines nuevos. "
                     "Los jardines existentes lo conservan."
                 ),
-            ),
-        ),
-        # 3. Borrar planes viejos, crear 4 tiers, reasignar suscripciones
-        migrations.RunPython(poblar_planes, revertir_planes),
-        # 4. Ahora que los datos están cargados, hacer slug y precio_minimo
-        # NOT NULL definitivamente
-        migrations.AlterField(
-            model_name="plan",
-            name="slug",
-            field=models.SlugField(
-                max_length=20,
-                unique=True,
-                help_text="Identificador único en código (mini, plus, pro, max).",
-            ),
-        ),
-        migrations.AlterField(
-            model_name="plan",
-            name="precio_minimo",
-            field=models.DecimalField(
-                max_digits=8,
-                decimal_places=2,
-                help_text="Piso negociable. Soporte interno NO debe cerrar ventas por debajo de este monto.",
             ),
         ),
         # 5. Cambiar opciones de Meta (verbose_name_plural y ordering)
