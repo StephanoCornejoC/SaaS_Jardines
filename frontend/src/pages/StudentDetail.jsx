@@ -490,7 +490,7 @@ export default function StudentDetail() {
             size="small"
             title={
               <Space>
-                <Avatar style={{ background: idx === 0 ? "#0d9488" : "#60a5fa" }} icon={<UserOutlined />} />
+                <Avatar style={{ background: idx === 0 ? "#028090" : "#60a5fa" }} icon={<UserOutlined />} />
                 <span>{a.nombres} {a.apellidos}</span>
                 {idx === 0 && <Tag color="green">Principal</Tag>}
               </Space>
@@ -805,7 +805,7 @@ export default function StudentDetail() {
       <Card
         style={{
           marginBottom: 16,
-          background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+          background: "linear-gradient(135deg, #028090 0%, #114B5F 100%)",
           border: "none",
         }}
         styles={{ body: { padding: 24 } }}
@@ -826,15 +826,15 @@ export default function StudentDetail() {
               {student.nombres} {student.apellidos}
             </Title>
             <Space size="middle" wrap style={{ marginTop: 8 }}>
-              <Tag color="white" style={{ color: "#0d9488", fontWeight: 600 }}>
+              <Tag color="white" style={{ color: "#028090", fontWeight: 600 }}>
                 DNI {student.dni}
               </Tag>
-              <Tag color="white" style={{ color: "#0d9488", fontWeight: 600 }}>
+              <Tag color="white" style={{ color: "#028090", fontWeight: 600 }}>
                 {student.edad} años
               </Tag>
               <Tag color={estadoCfg.color}>{estadoCfg.label}</Tag>
               {student.classroom_nombre && (
-                <Tag color="white" style={{ color: "#0d9488", fontWeight: 600 }}>
+                <Tag color="white" style={{ color: "#028090", fontWeight: 600 }}>
                   Aula: {student.classroom_nombre}
                 </Tag>
               )}

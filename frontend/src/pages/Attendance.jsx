@@ -158,7 +158,7 @@ export default function Attendance() {
     <div>
       <div style={{ marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
-          <CalendarOutlined style={{ marginRight: 8, color: "#0d9488" }} />
+          <CalendarOutlined style={{ marginRight: 8, color: "#028090" }} />
           Asistencia
         </Title>
         <Text type="secondary" style={{ fontSize: 13 }}>

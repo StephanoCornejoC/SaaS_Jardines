@@ -178,7 +178,7 @@ export default function Teachers() {
       width: 130,
       render: (_, record) =>
         record.sueldo_actual ? (
-          <Text strong style={{ color: "#0d9488" }}>
+          <Text strong style={{ color: "#028090" }}>
             S/. {Number(record.sueldo_actual).toFixed(2)}
           </Text>
         ) : (

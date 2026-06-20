@@ -17,7 +17,7 @@ const { Text } = Typography;
  */
 
 const TIER_STYLES = {
-  mini: { color: "#0d9488", bg: "#ccfbf1", border: "#5eead4" },
+  mini: { color: "#028090", bg: "#d9ecef", border: "#7cc0cb" },
   plus: { color: "#1d4ed8", bg: "#dbeafe", border: "#93c5fd" },
   pro:  { color: "#7c3aed", bg: "#ede9fe", border: "#c4b5fd" },
   max:  { color: "#b45309", bg: "#fef3c7", border: "#fcd34d" },

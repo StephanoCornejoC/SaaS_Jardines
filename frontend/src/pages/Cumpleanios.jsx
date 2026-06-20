@@ -55,7 +55,7 @@ export default function Cumpleanios() {
   return (
     <div>
       <Space style={{ marginBottom: 16 }} align="center">
-        <GiftOutlined style={{ fontSize: 24, color: "#0d9488" }} />
+        <GiftOutlined style={{ fontSize: 24, color: "#028090" }} />
         <Title level={3} style={{ margin: 0 }}>
           Cumpleaños del mes
         </Title>
@@ -108,7 +108,7 @@ export default function Cumpleanios() {
                   <Card
                     hoverable
                     style={{
-                      borderColor: esHoy ? "#0d9488" : undefined,
+                      borderColor: esHoy ? "#028090" : undefined,
                       borderWidth: esHoy ? 2 : 1,
                     }}
                     styles={{ body: { padding: 16 } }}
@@ -118,7 +118,7 @@ export default function Cumpleanios() {
                         <Text strong style={{ fontSize: 16 }}>
                           {alumno.nombres} {alumno.apellidos}
                         </Text>
-                        {esHoy && <Tag color="#0d9488">¡Hoy!</Tag>}
+                        {esHoy && <Tag color="#028090">¡Hoy!</Tag>}
                         {yaPaso && !esHoy && <Tag color="default">Ya pasó</Tag>}
                       </Space>
                       <Text type="secondary">

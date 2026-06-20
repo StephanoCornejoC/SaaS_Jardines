@@ -58,7 +58,7 @@ const reports = [
     key: "alumnos",
     title: "Lista de alumnos",
     description: "Alumnos activos agrupados por aula",
-    icon: <TeamOutlined style={{ fontSize: 32, color: "#0d9488" }} />,
+    icon: <TeamOutlined style={{ fontSize: 32, color: "#028090" }} />,
     endpoint: "/reports/alumnos-excel/",
     filename: () => "lista_alumnos.xlsx",
     fields: [],
@@ -147,7 +147,7 @@ export default function Reports() {
   return (
     <div>
       <Title level={4} style={{ margin: 0 }}>
-        <FileExcelOutlined style={{ marginRight: 8, color: "#0d9488" }} />
+        <FileExcelOutlined style={{ marginRight: 8, color: "#028090" }} />
         Reportes
       </Title>
       <Text type="secondary" style={{ fontSize: 13, marginBottom: 20, display: "block" }}>

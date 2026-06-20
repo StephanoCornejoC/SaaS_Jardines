@@ -109,7 +109,7 @@ export default function Dashboard() {
       {
         label: "Ingresos",
         data: seriesIngresos,
-        borderColor: "#0d9488",
+        borderColor: "#028090",
         backgroundColor: (ctx) => {
           const chart = ctx.chart;
           const { ctx: c, chartArea } = chart;
@@ -122,7 +122,7 @@ export default function Dashboard() {
         fill: true,
         tension: 0.35,
         pointRadius: 3,
-        pointBackgroundColor: "#0d9488",
+        pointBackgroundColor: "#028090",
         pointHoverRadius: 5,
         borderWidth: 2,
       },
@@ -177,7 +177,7 @@ export default function Dashboard() {
             title="Alumnos activos"
             value={data.total_alumnos}
             icon={<TeamOutlined />}
-            color="#0d9488"
+            color="#028090"
             bg="rgba(13,148,136,0.12)"
             hint="Matriculados"
           />
@@ -222,7 +222,7 @@ export default function Dashboard() {
       <Row gutter={[12, 12]} style={{ marginTop: 12 }}>
         <Col xs={24} lg={16}>
           <Card
-            title={<span><DollarOutlined style={{ color: "#0d9488", marginRight: 6 }}/>Ingresos mensuales del año</span>}
+            title={<span><DollarOutlined style={{ color: "#028090", marginRight: 6 }}/>Ingresos mensuales del año</span>}
             extra={<Tag color="cyan">Total: S/. {totalAnio.toFixed(2)}</Tag>}
             styles={{ body: { padding: 12 } }}
           >

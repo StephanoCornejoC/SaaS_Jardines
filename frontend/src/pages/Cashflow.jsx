@@ -216,7 +216,7 @@ export default function Cashflow() {
         <>
           <Card style={{ marginBottom: 16 }} styles={{ body: { padding: 12 } }}>
             <Space wrap>
-              <FilterOutlined style={{ color: "#0d9488" }} />
+              <FilterOutlined style={{ color: "#028090" }} />
               <Text>Mostrando:</Text>
               <Select
                 value={mesFilter}
@@ -269,7 +269,7 @@ export default function Cashflow() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <Title level={4} style={{ margin: 0 }}>
-            <WalletOutlined style={{ marginRight: 8, color: "#0d9488" }} />
+            <WalletOutlined style={{ marginRight: 8, color: "#028090" }} />
             Caja
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>

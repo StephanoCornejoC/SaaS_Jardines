@@ -186,7 +186,7 @@ export default function MainLayout() {
           <Text
             strong
             style={{
-              color: "#14b8a6",
+              color: "#ffffff",
               fontSize: collapsed ? 20 : 24,
               letterSpacing: collapsed ? 1 : 3,
               textTransform: "uppercase",
@@ -234,11 +234,11 @@ export default function MainLayout() {
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <Avatar
               size={32}
-              style={{ background: "#0d9488", fontSize: 13, fontWeight: 600, cursor: "default" }}
+              style={{ background: "#028090", fontSize: 13, fontWeight: 600, cursor: "default" }}
             >
               {userInitials}
             </Avatar>
-            <Text style={{ fontSize: 14, fontWeight: 600, color: "#0d9488" }}>
+            <Text style={{ fontSize: 14, fontWeight: 600, color: "#028090" }}>
               {jardinName}
             </Text>
             <Button
@@ -305,7 +305,7 @@ export default function MainLayout() {
           >
             <Text type="secondary" style={{ fontSize: 12 }}>
               Una aplicación de{" "}
-              <Text strong style={{ color: "#0d9488" }}>{BRAND_NAME}</Text>
+              <Text strong style={{ color: "#028090" }}>{BRAND_NAME}</Text>
             </Text>
             <Link
               href={`https://wa.me/${SUPPORT_WHATSAPP_INTL}`}
@@ -322,7 +322,7 @@ export default function MainLayout() {
               style={{ color: "rgba(0,0,0,0.55)", fontSize: 12 }}
               aria-label="Soporte por email"
             >
-              <MailOutlined style={{ marginRight: 6, color: "#0d9488" }} />
+              <MailOutlined style={{ marginRight: 6, color: "#028090" }} />
               {SUPPORT_EMAIL}
             </Link>
           </Space>

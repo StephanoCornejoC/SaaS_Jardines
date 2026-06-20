@@ -186,7 +186,7 @@ export default function Payments() {
   return (
     <div>
       <Title level={4} style={{ margin: 0, marginBottom: 4 }}>
-        <DollarOutlined style={{ marginRight: 8, color: "#0d9488" }} />
+        <DollarOutlined style={{ marginRight: 8, color: "#028090" }} />
         Pensiones
       </Title>
       <Text type="secondary" style={{ fontSize: 13, marginBottom: 20, display: "block" }}>
@@ -278,14 +278,14 @@ export default function Payments() {
               <Card
                 style={{
                   marginBottom: 16,
-                  background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                  background: "linear-gradient(135deg, #028090 0%, #114B5F 100%)",
                   border: "none",
                 }}
                 styles={{ body: { padding: 20 } }}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
                   <Space size="middle">
-                    <Avatar size={64} icon={<UserOutlined />} style={{ background: "white", color: "#0d9488", fontSize: 28 }} />
+                    <Avatar size={64} icon={<UserOutlined />} style={{ background: "white", color: "#028090", fontSize: 28 }} />
                     <div>
                       <Title level={4} style={{ color: "white", margin: 0 }}>
                         {studentDetail.student.nombre}
@@ -440,7 +440,7 @@ export default function Payments() {
                 key: "monto",
                 label: "Monto",
                 children: (
-                  <Text strong style={{ color: "#0d9488", fontSize: 16 }}>
+                  <Text strong style={{ color: "#028090", fontSize: 16 }}>
                     S/. {Number(payingPayment.monto).toFixed(2)}
                   </Text>
                 ),

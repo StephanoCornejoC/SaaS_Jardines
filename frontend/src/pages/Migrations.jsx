@@ -140,7 +140,7 @@ export default function Migrations() {
   return (
     <div>
       <Title level={4} style={{ margin: 0 }}>
-        <SwapOutlined style={{ marginRight: 8, color: "#0d9488" }} />
+        <SwapOutlined style={{ marginRight: 8, color: "#028090" }} />
         Migración anual
       </Title>
       <Text type="secondary" style={{ fontSize: 13, marginBottom: 20, display: "block" }}>
@@ -323,7 +323,7 @@ function PreviewView({ preview }) {
             <Statistic
               title="Total alumnos"
               value={total_alumnos}
-              valueStyle={{ color: "#0d9488" }}
+              valueStyle={{ color: "#028090" }}
             />
           </Card>
         </Col>

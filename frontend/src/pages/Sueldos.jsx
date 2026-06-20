@@ -183,7 +183,7 @@ export default function Sueldos() {
   return (
     <div>
       <Title level={4} style={{ margin: 0, marginBottom: 4 }}>
-        <DollarOutlined style={{ marginRight: 8, color: "#0d9488" }} />
+        <DollarOutlined style={{ marginRight: 8, color: "#028090" }} />
         Sueldos del personal
       </Title>
       <Text type="secondary" style={{ fontSize: 13, marginBottom: 20, display: "block" }}>
@@ -220,7 +220,7 @@ export default function Sueldos() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
               {teachers.map((t) => {
                 const tipo = TIPO_TAG[t.tipo] || TIPO_TAG.TITULAR;
-                const avatarBg = t.tipo === "AUXILIAR" ? "#6366f1" : "#0d9488";
+                const avatarBg = t.tipo === "AUXILIAR" ? "#6366f1" : "#028090";
                 return (
                   <Card
                     key={t.id}
@@ -279,7 +279,7 @@ export default function Sueldos() {
               <Card
                 style={{
                   marginBottom: 16,
-                  background: "linear-gradient(135deg, #0d9488 0%, #14b8a6 100%)",
+                  background: "linear-gradient(135deg, #028090 0%, #114B5F 100%)",
                   border: "none",
                 }}
                 styles={{ body: { padding: 20 } }}
@@ -297,7 +297,7 @@ export default function Sueldos() {
                     <Avatar
                       size={64}
                       icon={<UserOutlined />}
-                      style={{ background: "white", color: "#0d9488", fontSize: 28 }}
+                      style={{ background: "white", color: "#028090", fontSize: 28 }}
                     />
                     <div>
                       <Title level={4} style={{ color: "white", margin: 0 }}>
@@ -460,7 +460,7 @@ export default function Sueldos() {
                 key: "s",
                 label: "Sueldo acordado",
                 children: (
-                  <Text strong style={{ color: "#0d9488" }}>
+                  <Text strong style={{ color: "#028090" }}>
                     S/. {Number(detail.sueldo_mensual).toFixed(2)}
                   </Text>
                 ),

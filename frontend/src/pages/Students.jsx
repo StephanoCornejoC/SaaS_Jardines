@@ -364,7 +364,7 @@ export default function Students() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <Title level={4} style={{ margin: 0 }}>
-            <TeamOutlined style={{ marginRight: 8, color: "#0d9488" }} />
+            <TeamOutlined style={{ marginRight: 8, color: "#028090" }} />
             Alumnos
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
@@ -422,7 +422,7 @@ export default function Students() {
       <Modal
         title={
           <Space>
-            <UserAddOutlined style={{ color: "#0d9488" }} />
+            <UserAddOutlined style={{ color: "#028090" }} />
             <span>Registrar nuevo alumno</span>
           </Space>
         }
