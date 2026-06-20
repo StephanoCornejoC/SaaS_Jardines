@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth import get_user_model
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -68,3 +70,27 @@ class UserViewSet(viewsets.ModelViewSet):
             {"detail": "Contraseña actualizada correctamente."},
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=False, methods=["post"], url_path="logout")
+    def logout(self, request):
+        """Cierra la sesión del usuario.
+
+        Rota `active_session_id` → el access token vigente queda inválido en
+        el próximo request (su claim 'sid' deja de coincidir), así un token
+        robado deja de servir de inmediato sin esperar a que expire. Si se
+        manda el refresh en el body, también se blacklistea.
+        """
+        user = request.user
+        user.active_session_id = uuid.uuid4()
+        user.save(update_fields=["active_session_id"])
+
+        refresh = request.data.get("refresh")
+        if refresh:
+            try:
+                from rest_framework_simplejwt.tokens import RefreshToken
+                RefreshToken(refresh).blacklist()
+            except Exception:
+                # Token inválido/expirado: la rotación de sid ya cerró la sesión.
+                pass
+
+        return Response({"detail": "Sesión cerrada."}, status=status.HTTP_200_OK)

@@ -289,8 +289,11 @@ class TenantAdmin(ModelAdmin):
                 last_name=data["apellidos_director"],
                 password=password,
             )
-            user.is_staff = True
-            user.is_superuser = True
+            # La directora opera su jardín por la app (API DRF, rol
+            # ADMIN_JARDIN), NO por el admin de Django. Darle is_staff/
+            # is_superuser le permitía entrar al admin y, vía
+            # /admin/op/<otro-schema>/, operar el jardín de OTRO cliente
+            # (hallazgo de seguridad C1). Solo el SUPERADMIN entra al admin.
             user.role = "ADMIN_JARDIN"
             user.save()
 

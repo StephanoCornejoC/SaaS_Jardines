@@ -175,7 +175,7 @@ class StudentAdmin(ModelAdmin):
     @admin.display(description="Foto", )
     def foto_preview(self, obj):
         if not obj.foto:
-            return mark_safe('<em style="color:#888">Sin foto cargada</em>')
+            return format_html('<em style="color:#888">Sin foto cargada</em>')
         return format_html(
             '<img src="{}" style="max-width:200px;max-height:200px;'
             'border-radius:8px;border:1px solid #ddd">',

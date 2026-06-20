@@ -21,6 +21,7 @@ apps/platform/management/commands/) capturando su stdout/stderr para
 visibilidad. Ese command es idempotente: si corre dos veces el mismo dia
 no duplica cobros ni emails.
 """
+import hmac
 import logging
 import os
 from io import StringIO
@@ -73,7 +74,7 @@ def daily_cron_token_view(request):
         )
 
     provided = auth_header[len("Bearer "):].strip()
-    if provided != expected:
+    if not hmac.compare_digest(provided, expected):
         logger.warning("daily_cron: invalid token attempt from %s", request.META.get("REMOTE_ADDR"))
         return JsonResponse({"ok": False, "error": "invalid token"}, status=403)
 

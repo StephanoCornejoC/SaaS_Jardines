@@ -259,14 +259,42 @@ class PaymentAdmin(ModelAdmin):
 
     @admin.action(description="Marcar como PAGADO (fecha hoy)")
     def accion_marcar_pagado_hoy(self, request, queryset):
+        # Antes este bulk hacía queryset.update() y NO generaba el ingreso
+        # en Caja → dejaba plata fuera del flujo y descuadraba el cierre
+        # mensual (hallazgo de seguridad). Ahora crea la CashTransaction por
+        # cada pago que entra a PAGADO, idempotente (get_or_create por
+        # referencia_pago), igual que el endpoint del app. Los que ya están
+        # PAGADO se omiten (no se duplica el ingreso).
+        from apps.cashflow.models import CashCategory, CashTransaction
+
         today = date.today()
-        n = queryset.update(estado=Payment.Estado.PAGADO, fecha_pago=today)
+        category, _ = CashCategory.objects.get_or_create(
+            nombre="Pensiones", tipo="INGRESO", defaults={"es_sistema": True},
+        )
+        n = 0
+        for payment in queryset:
+            if payment.estado == Payment.Estado.PAGADO:
+                continue
+            payment.estado = Payment.Estado.PAGADO
+            payment.fecha_pago = today
+            payment.save(update_fields=["estado", "fecha_pago"])
+            CashTransaction.objects.get_or_create(
+                referencia_pago=payment,
+                defaults={
+                    "categoria": category,
+                    "descripcion": f"Pension {payment.student} - {payment.mes}/{payment.anio}",
+                    "monto": payment.monto,
+                    "tipo": "INGRESO",
+                    "fecha": today,
+                    "creado_por": request.user if request.user.is_authenticated else None,
+                },
+            )
+            n += 1
         self.message_user(
             request,
-            f"{n} pago(s) marcado(s) como PAGADO con fecha {today.strftime('%d/%m/%Y')}. "
-            "Nota: estas marcas masivas NO crean CashTransactions automáticas — "
-            "se usan para limpiar registros viejos. El flujo normal de pago "
-            "desde el frontend sí genera el ingreso en Caja.",
+            f"{n} pago(s) marcado(s) como PAGADO con fecha "
+            f"{today.strftime('%d/%m/%Y')} y registrado(s) en Caja "
+            "(los que ya estaban PAGADO se omiten).",
             messages.SUCCESS,
         )
 

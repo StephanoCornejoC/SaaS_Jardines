@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
@@ -62,6 +64,10 @@ class ChangePasswordSerializer(serializers.Serializer):
     def save(self, **kwargs):
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password"])
+        # Rotar la sesión activa: invalida al instante cualquier access token
+        # vivo emitido con la contraseña anterior (su 'sid' deja de coincidir
+        # con active_session_id). El blacklist de abajo cubre los refresh.
+        user.active_session_id = uuid.uuid4()
         user.save()
 
         # SECURITY [VULN-018]: Invalidate all existing JWT tokens so that

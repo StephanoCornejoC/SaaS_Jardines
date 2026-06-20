@@ -6,15 +6,29 @@ admin. El switch real (activar schema_context) lo hace
 """
 
 from django.contrib.admin.views.decorators import staff_member_required
+from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect
 
 from apps.tenants.models import Tenant
+
+
+def _require_superadmin(request):
+    """Defensa en profundidad: solo el SUPERADMIN opera jardines.
+
+    `staff_member_required` ya bloquea a quien no tenga is_staff, pero NO
+    confiamos solo en eso: exigimos rol SUPERADMIN explícito para que,
+    aunque un usuario quede con is_staff por error, no pueda entrar al
+    schema de otro jardín (hallazgo de seguridad C1).
+    """
+    if not getattr(request.user, "is_superadmin", False):
+        raise PermissionDenied("Solo el SUPERADMIN de COREM puede operar jardines.")
 
 
 @staff_member_required
 def enter_tenant_mode_view(request, schema):
     """Setea `active_tenant_schema` en la sesión y redirige al index del
     admin (que en modo tenant muestra los modelos del jardín)."""
+    _require_superadmin(request)
     tenant = get_object_or_404(Tenant, schema_name=schema)
     request.session["active_tenant_schema"] = tenant.schema_name
     request.session["active_tenant_nombre"] = tenant.nombre
@@ -24,6 +38,7 @@ def enter_tenant_mode_view(request, schema):
 @staff_member_required
 def exit_tenant_mode_view(request):
     """Borra `active_tenant_schema` de la sesión y vuelve al Hub."""
+    _require_superadmin(request)
     request.session.pop("active_tenant_schema", None)
     request.session.pop("active_tenant_nombre", None)
     return redirect("/admin/")

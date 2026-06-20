@@ -221,6 +221,48 @@ class StudentDetailSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({campo: str(exc)})
         return value
 
+    # --- Validación de archivos subidos (tamaño + tipo real) ---
+    MAX_FOTO_MB = 5
+    MAX_FICHA_MB = 10
+
+    def validate_foto(self, value):
+        if value in (None, ""):
+            return value
+        if value.size > self.MAX_FOTO_MB * 1024 * 1024:
+            raise serializers.ValidationError(
+                f"La foto no puede superar {self.MAX_FOTO_MB} MB."
+            )
+        name = (getattr(value, "name", "") or "").lower()
+        if not name.endswith((".jpg", ".jpeg", ".png", ".webp")):
+            raise serializers.ValidationError(
+                "Formato de imagen no permitido (usá JPG, PNG o WEBP)."
+            )
+        return value
+
+    def validate_ficha_matricula(self, value):
+        if value in (None, ""):
+            return value
+        if value.size > self.MAX_FICHA_MB * 1024 * 1024:
+            raise serializers.ValidationError(
+                f"La ficha de matrícula no puede superar {self.MAX_FICHA_MB} MB."
+            )
+        name = (getattr(value, "name", "") or "").lower()
+        if not name.endswith(".pdf"):
+            raise serializers.ValidationError(
+                "La ficha de matrícula debe ser un archivo PDF."
+            )
+        # Magic bytes: un PDF real empieza con "%PDF".
+        try:
+            head = value.read(5)
+            value.seek(0)
+        except Exception:
+            head = b""
+        if head[:4] != b"%PDF":
+            raise serializers.ValidationError(
+                "El archivo no parece un PDF válido."
+            )
+        return value
+
     def create(self, validated_data):
         apoderados_data = validated_data.pop("apoderados", [])
         matricula_data = validated_data.pop("matricula", None)

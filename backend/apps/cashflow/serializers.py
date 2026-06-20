@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from .models import CashCategory, CashTransaction, MonthlyClosure
@@ -46,7 +47,19 @@ class CashTransactionSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["creado_por"] = request.user
-        return super().create(validated_data)
+        # Validación de negocio: el tipo de la transacción debe coincidir
+        # con el tipo de la categoría (CashTransaction.clean). Sin esto se
+        # podía crear un INGRESO con categoría de EGRESO y descuadrar la
+        # caja (C3). Convertimos el ValidationError del modelo en un 400 DRF.
+        instance = CashTransaction(**validated_data)
+        try:
+            instance.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                getattr(exc, "message_dict", None) or exc.messages
+            )
+        instance.save()
+        return instance
 
 
 class MonthlyClosureSerializer(serializers.ModelSerializer):

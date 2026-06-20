@@ -34,6 +34,32 @@ def _validar_fecha_teacher(user, fecha):
         )
 
 
+def _classrooms_de_teacher(user):
+    """IDs de las aulas donde el usuario (TEACHER) es titular o auxiliar."""
+    from apps.teachers.models import Teacher
+
+    teacher = Teacher.objects.filter(user=user).first()
+    if teacher is None:
+        return set()
+    return set(
+        Classroom.objects.filter(
+            Q(profesor_titular=teacher) | Q(profesor_auxiliar=teacher)
+        ).values_list("id", flat=True)
+    )
+
+
+def _validar_classroom_teacher(user, classroom):
+    """Un TEACHER solo opera asistencia de SUS aulas (titular/auxiliar).
+    Para ADMIN_JARDIN / SUPERADMIN no aplica restricción."""
+    if not _es_teacher(user):
+        return
+    classroom_id = getattr(classroom, "id", classroom)
+    if classroom_id not in _classrooms_de_teacher(user):
+        raise PermissionDenied(
+            "Como profesor solo puede operar asistencia de las aulas a su cargo."
+        )
+
+
 class AttendanceViewSet(viewsets.ModelViewSet):
     # TEACHER + ADMIN. La restricción de "solo día actual" para TEACHER se
     # aplica explícitamente en cada acción de escritura más abajo.
@@ -47,8 +73,20 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     ordering_fields = ["fecha", "created_at"]
     ordering = ["-fecha"]
 
+    def get_queryset(self):
+        # Un TEACHER solo ve/edita asistencia de las aulas a su cargo.
+        qs = super().get_queryset()
+        if _es_teacher(self.request.user):
+            qs = qs.filter(
+                classroom_id__in=_classrooms_de_teacher(self.request.user)
+            )
+        return qs
+
     def perform_create(self, serializer):
         _validar_fecha_teacher(self.request.user, serializer.validated_data.get("fecha"))
+        _validar_classroom_teacher(
+            self.request.user, serializer.validated_data.get("classroom")
+        )
         serializer.save()
 
     def perform_update(self, serializer):
@@ -56,10 +94,15 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         # instance.fecha si no llega un override.
         fecha = serializer.validated_data.get("fecha", serializer.instance.fecha)
         _validar_fecha_teacher(self.request.user, fecha)
+        classroom = serializer.validated_data.get(
+            "classroom", serializer.instance.classroom
+        )
+        _validar_classroom_teacher(self.request.user, classroom)
         serializer.save()
 
     def perform_destroy(self, instance):
         _validar_fecha_teacher(self.request.user, instance.fecha)
+        _validar_classroom_teacher(self.request.user, instance.classroom)
         instance.delete()
 
     @action(detail=False, methods=["post"], url_path="registro-masivo")
@@ -85,6 +128,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 {"error": "Aula no encontrada."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        # TEACHER solo puede registrar masivamente en sus propias aulas.
+        _validar_classroom_teacher(request.user, classroom)
 
         # SECURITY: Validate that all student IDs belong to the specified
         # classroom to prevent recording attendance for unrelated students.
@@ -153,6 +199,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
                 {"error": "Los parámetros mes, anio y classroom_id deben ser numéricos."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+
+        # TEACHER solo puede ver el reporte de sus propias aulas.
+        _validar_classroom_teacher(request.user, classroom_id)
 
         attendances = Attendance.objects.filter(
             classroom_id=classroom_id,

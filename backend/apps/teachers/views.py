@@ -7,7 +7,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.cashflow.models import CashCategory, CashTransaction
@@ -38,11 +37,11 @@ class TeacherViewSet(viewsets.ModelViewSet):
             return TeacherListSerializer
         return TeacherDetailSerializer
 
-    def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy',
-                           'registrar_sueldo', 'actualizar_sueldo']:
-            return [IsAdminJardinOrAbove()]
-        return [IsAuthenticated()]
+    # Todas las acciones de este viewset son solo para ADMIN_JARDIN o
+    # superior (ver permission_classes de clase). NO hay override de
+    # get_permissions: antes dejaba `list`, `retrieve` y `sueldos` en
+    # IsAuthenticated, lo que exponía los sueldos de los profesores al rol
+    # TEACHER (hallazgo de seguridad A1).
 
     @action(detail=True, methods=["patch"], url_path="actualizar-sueldo")
     def actualizar_sueldo(self, request, pk=None):

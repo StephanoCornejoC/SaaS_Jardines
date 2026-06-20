@@ -4,8 +4,9 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.db import connection
 from django.shortcuts import render
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+from apps.users.permissions import IsAdminJardinOrAbove
 from rest_framework import status
 
 from .models import Plan, TenantSubscription
@@ -22,7 +23,7 @@ def admin_dashboard(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAdminJardinOrAbove])
 def tier_status(request):
     """
     GET /api/v1/platform/tier-status/

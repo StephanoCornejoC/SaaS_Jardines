@@ -76,6 +76,10 @@ SECURE_SSL_REDIRECT = True
 SECURE_REDIRECT_EXEMPT = [r"^health/?$"]
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
+# SameSite=Lax explícito: el admin usa cookie de sesión same-site; el
+# frontend usa JWT (header Authorization), no depende de cookies cross-site.
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
 X_FRAME_OPTIONS = "DENY"
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True

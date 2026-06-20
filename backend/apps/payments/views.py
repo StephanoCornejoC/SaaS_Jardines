@@ -2,6 +2,7 @@ from calendar import monthrange
 from datetime import date
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Sum
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
@@ -79,39 +80,54 @@ class PaymentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["patch"], url_path="registrar-pago")
     def registrar_pago(self, request, pk=None):
-        """Registrar el pago de una pension."""
-        payment = self.get_object()
+        """Registrar el pago de una pension.
+
+        Idempotente: el ingreso en Caja se crea SOLO en la transición a
+        PAGADO. Si el pago ya estaba PAGADO (doble clic, retry de red,
+        reintento malicioso), no se duplica la CashTransaction ni se infla
+        el balance (hallazgo de seguridad C2).
+        """
         serializer = PaymentRegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        payment.estado = serializer.validated_data["estado"]
-        payment.metodo_pago = serializer.validated_data.get("metodo_pago", "")
-        payment.comprobante = serializer.validated_data.get("comprobante", "")
-        payment.observaciones = serializer.validated_data.get("observaciones", "")
+        with transaction.atomic():
+            # Lock de fila: serializa registros concurrentes del mismo pago.
+            payment = Payment.objects.select_for_update().get(pk=self.get_object().pk)
+            estado_anterior = payment.estado
 
-        if payment.estado == Payment.Estado.PAGADO:
-            payment.fecha_pago = date.today()
+            payment.estado = serializer.validated_data["estado"]
+            payment.metodo_pago = serializer.validated_data.get("metodo_pago", "")
+            payment.comprobante = serializer.validated_data.get("comprobante", "")
+            payment.observaciones = serializer.validated_data.get("observaciones", "")
 
-        if request.user.is_authenticated:
-            payment.registrado_por = request.user
+            if payment.estado == Payment.Estado.PAGADO:
+                payment.fecha_pago = date.today()
+            if request.user.is_authenticated:
+                payment.registrado_por = request.user
+            payment.save()
 
-        payment.save()
-
-        if payment.estado == Payment.Estado.PAGADO:
-            category, _ = CashCategory.objects.get_or_create(
-                nombre="Pensiones",
-                tipo="INGRESO",
-                defaults={"es_sistema": True},
-            )
-            CashTransaction.objects.create(
-                categoria=category,
-                descripcion=f"Pension {payment.student} - {payment.mes}/{payment.anio}",
-                monto=payment.monto,
-                tipo="INGRESO",
-                fecha=payment.fecha_pago or date.today(),
-                referencia_pago=payment,
-                creado_por=request.user,
-            )
+            if (
+                payment.estado == Payment.Estado.PAGADO
+                and estado_anterior != Payment.Estado.PAGADO
+            ):
+                category, _ = CashCategory.objects.get_or_create(
+                    nombre="Pensiones",
+                    tipo="INGRESO",
+                    defaults={"es_sistema": True},
+                )
+                # get_or_create por referencia_pago: blindaje extra contra
+                # duplicados aunque la guardia de estado fallara.
+                CashTransaction.objects.get_or_create(
+                    referencia_pago=payment,
+                    defaults={
+                        "categoria": category,
+                        "descripcion": f"Pension {payment.student} - {payment.mes}/{payment.anio}",
+                        "monto": payment.monto,
+                        "tipo": "INGRESO",
+                        "fecha": payment.fecha_pago or date.today(),
+                        "creado_por": request.user if request.user.is_authenticated else None,
+                    },
+                )
 
         return Response(PaymentDetailSerializer(payment).data)
 

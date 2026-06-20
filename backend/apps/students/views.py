@@ -63,7 +63,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         nacimiento, aula y edad que cumple. Ordenado por día del mes
         ascendente para que sea fácil ver "quién sigue esta semana".
 
-        Restringido a admin (la profesora no necesita este módulo).
+        Accesible para ADMIN_JARDIN y TEACHER (solo lectura).
         """
         try:
             mes = int(request.query_params.get("mes", date.today().month))

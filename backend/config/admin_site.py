@@ -130,6 +130,23 @@ class CoremAdminSite(admin.AdminSite):
     enable_nav_sidebar = True
     index_template = "admin/corem_index.html"
 
+    # ----- Gate de acceso -----
+
+    def has_permission(self, request):
+        """Solo el SUPERADMIN de COREM entra al admin.
+
+        Las directoras (ADMIN_JARDIN) y profesoras (TEACHER) operan por la
+        app, NO por el admin. Si pudieran entrar, podrían cambiar la sesión
+        a /admin/op/<otro-schema>/ y operar el jardín de otro cliente (C1).
+        Exigimos rol SUPERADMIN explícito — no alcanza con is_staff.
+        """
+        user = request.user
+        return bool(
+            user.is_active
+            and user.is_authenticated
+            and getattr(user, "is_superadmin", False)
+        )
+
     # ----- Helpers de modo -----
 
     def is_tenant_mode(self, request):
