@@ -257,6 +257,13 @@ class TenantAdmin(ModelAdmin):
         Domain.objects.create(
             domain=data["dominio"], tenant=tenant, is_primary=True
         )
+        # 2b. Alta automática del subdominio en Vercel, DESPUÉS de que la
+        # transacción commitee (on_commit): así no agregamos el dominio si el
+        # alta falla y hace rollback. No-op si no hay VERCEL_TOKEN (dev).
+        # Nunca rompe el alta — add_domain_to_vercel no lanza.
+        from .vercel import add_domain_to_vercel
+        _dominio_vercel = data["dominio"]
+        transaction.on_commit(lambda: add_domain_to_vercel(_dominio_vercel))
         # 3. Crear suscripción con trial 1 mes.
         # Un jardín nuevo arranca sin alumnos cargados → tier Mini por default.
         # Cuando la directora carga alumnos durante el trial, el tier real se

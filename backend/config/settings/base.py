@@ -19,6 +19,14 @@ def _get_secret_key():
 
 SECRET_KEY = _get_secret_key()
 
+# --- Integraciones externas ---
+# Alta automática de subdominios de jardines en Vercel (ver apps/tenants/vercel.py).
+# Vacío en dev/local → el alta del dominio es no-op. En Railway se setean para
+# que cada jardín nuevo registre su subdominio sin intervención manual.
+VERCEL_TOKEN = os.environ.get("VERCEL_TOKEN", "")
+VERCEL_PROJECT_ID = os.environ.get("VERCEL_PROJECT_ID", "")
+VERCEL_TEAM_ID = os.environ.get("VERCEL_TEAM_ID", "")
+
 # --- Multi-Tenancy (django-tenants) ---
 SHARED_APPS = [
     "django_tenants",
@@ -51,6 +59,7 @@ TENANT_APPS = [
     "django.contrib.auth",
     "apps.users",
     "apps.students",
+    "apps.consents",
     "apps.teachers",
     "apps.classrooms",
     "apps.enrollments",

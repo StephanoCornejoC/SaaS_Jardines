@@ -37,9 +37,11 @@ import {
   FilePdfOutlined,
   UploadOutlined,
   FileDoneOutlined,
+  SafetyCertificateOutlined,
 } from "@ant-design/icons";
 import dayjs from "dayjs";
 import api from "../services/api";
+import StudentConsents from "../components/StudentConsents";
 
 const { Title, Text } = Typography;
 
@@ -850,6 +852,7 @@ export default function StudentDetail() {
             { key: "datos",       forceRender: true, label: <span><UserOutlined /> Datos del alumno</span>, children: datosTab },
             { key: "apoderados",  forceRender: true, label: <span><TeamOutlined /> Apoderados</span>,        children: apoderadosTab },
             { key: "ficha",       forceRender: true, label: <span><HeartOutlined /> Ficha médica</span>,     children: fichaTab },
+            { key: "consentimientos", forceRender: true, label: <span><SafetyCertificateOutlined /> Consentimientos</span>, children: <StudentConsents studentId={id} apoderados={student.apoderados || []} /> },
             { key: "matriculas",  forceRender: true, label: <span><DollarOutlined /> Matrículas</span>,      children: matriculasTab },
             { key: "pagos",       forceRender: true, label: <span><DollarOutlined /> Pensiones</span>,       children: pagosTab },
           ]}
