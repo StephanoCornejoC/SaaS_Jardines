@@ -33,7 +33,9 @@ jobs:
       - name: POST a /api/v1/cron/daily/
         env:
           CRON_SECRET_TOKEN: ${{ secrets.CRON_SECRET_TOKEN }}
-          BACKEND_URL: https://miniddo.com
+          # miniddo.com es el frontend (Vercel, rewrite SPA -> POST da 405).
+          # El backend Django vive en Railway bajo api.miniddo.com.
+          BACKEND_URL: https://api.miniddo.com
         run: |
           set -euo pipefail
 
